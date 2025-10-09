@@ -10,6 +10,10 @@ function Home() {
     navigate('/d2l');
   };
 
+  const handleMakeupClick = () => {
+    navigate('/makeup');
+  };
+
   return (
     <div className="home-container">
       <header className="header">
@@ -24,6 +28,7 @@ function Home() {
             <h2>Automation Scripts</h2>
           </div>
           <button className="menu-button blue" onClick={handleD2LClick}>D2L Macro</button>
+          <button className="menu-button green" onClick={handleMakeupClick}>Makeup Exam Macro</button>
         </section>
 
         {/* RIGHT SIDE - DATABASE */}

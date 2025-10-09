@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || process.env.BACKEND_PORT || 5000;
 
 // Middleware
 app.use(cors());
@@ -29,10 +29,12 @@ const storage = multer.diskStorage({
 const upload = multer({ 
   storage: storage,
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+    // Allow CSV files for D2L interface and PDF files for makeup exam interface
+    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv') ||
+        file.mimetype === 'application/pdf' || file.originalname.endsWith('.pdf')) {
       cb(null, true);
     } else {
-      cb(new Error('Only CSV files are allowed'), false);
+      cb(new Error('Only CSV and PDF files are allowed'), false);
     }
   }
 });
@@ -317,6 +319,284 @@ app.get('/api/d2l/status/:processId', (req, res) => {
     output: processInfo.output || '',
     error: processInfo.error || ''
   });
+});
+
+// ===== MAKEUP EXAM INTERFACE API ENDPOINTS =====
+
+// Login to makeup exam system
+app.post('/api/makeup/login', (req, res) => {
+  try {
+    const loginUrl = "https://my.lonestar.edu/psp/ihprd/?cmd=login";
+    
+    // Open Chrome browser with debugging port enabled
+    const { exec } = require('child_process');
+          const chromeCommand = `start "" /max chrome --remote-debugging-port=9222 --user-data-dir="%TEMP%\\chrome_debug" --window-position=-1920,0 --window-size=1920,1080 "${loginUrl}"`;
+    
+    exec(chromeCommand, (error, stdout, stderr) => {
+      if (error) {
+        console.error('Browser open error:', error);
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Failed to open browser: ' + error.message 
+        });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: 'Browser opened with debugging - Please log in manually' 
+      });
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Open CSV file for editing
+app.post('/api/makeup/open-csv', (req, res) => {
+  try {
+    const csvPath = path.join(__dirname, '..', '..', 'Make-Up-Exam-Macro', 'Students.csv');
+    
+    if (!fs.existsSync(csvPath)) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Students.csv file not found' 
+      });
+    }
+
+    // Open CSV file with default application
+    const { exec } = require('child_process');
+    exec(`start "" "${csvPath}"`, (error, stdout, stderr) => {
+      // Always return success for file opening, even if there are minor errors
+      // The start command often returns non-zero exit codes but still opens the file
+      res.json({ 
+        success: true, 
+        message: 'CSV file opened for editing' 
+      });
+    });
+
+  } catch (error) {
+    console.error('Open CSV error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Load CSV data
+app.post('/api/makeup/load-csv', (req, res) => {
+  try {
+    const csvPath = path.join(__dirname, '..', '..', 'Make-Up-Exam-Macro', 'Students.csv');
+    
+    if (!fs.existsSync(csvPath)) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Students.csv file not found' 
+      });
+    }
+
+    // Read and parse CSV
+    const csvContent = fs.readFileSync(csvPath, 'utf-8');
+    const lines = csvContent.split('\n').filter(line => line.trim());
+    
+    if (lines.length < 4) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'CSV missing required rows' 
+      });
+    }
+
+    // Parse header and data rows
+    const headerRow = lines[0].split(',').map(x => x.trim());
+    const dataRow = lines[1].split(',').map(x => x.trim());
+    
+    if (!headerRow.includes('Term') || !headerRow.includes('Exam')) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'CSV missing Term or Exam headers' 
+      });
+    }
+
+    const termIndex = headerRow.indexOf('Term');
+    const examIndex = headerRow.indexOf('Exam');
+    const term = dataRow[termIndex];
+    const exam = dataRow[examIndex];
+
+    // Parse student data
+    const studentHeaders = lines[2].split(',').map(x => x.trim());
+    const students = [];
+    
+    for (let i = 3; i < lines.length; i++) {
+      const studentData = lines[i].split(',').map(x => x.trim());
+      if (studentData.length >= studentHeaders.length && studentData[0] && studentData[1]) {
+        const student = {};
+        studentHeaders.forEach((header, index) => {
+          student[header] = studentData[index] || '';
+        });
+        students.push(student);
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      students: students,
+      term: term,
+      exam: exam,
+      message: `Loaded ${students.length} students from CSV` 
+    });
+
+  } catch (error) {
+    console.error('CSV load error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Start automation process
+app.post('/api/makeup/start-automation', upload.single('examFile'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No exam file provided' 
+      });
+    }
+
+    const examFilePath = req.file.path;
+    const agentScriptPath = path.join(__dirname, '..', '..', 'Make-Up-Exam-Macro', 'agent.py');
+    
+    if (!fs.existsSync(agentScriptPath)) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Agent script not found' 
+      });
+    }
+
+    // Use the external automation script
+    const automationScriptPath = path.join(__dirname, 'automation_agent.py');
+    const macroDir = path.join(__dirname, '..', '..', 'Make-Up-Exam-Macro');
+    
+    // Run the external Python automation script
+    const pythonCommand = `python "${automationScriptPath}" "${macroDir}" "${examFilePath}"`;
+
+    // Execute the Python script with UTF-8 encoding
+    const pythonProcess = spawn('python', [automationScriptPath, macroDir, examFilePath], {
+      cwd: path.join(__dirname, '..', '..', 'Make-Up-Exam-Macro'),
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+    });
+
+    let output = '';
+    let errorOutput = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+      // No temp file to clean up since we're using external script
+
+      console.log('Python process exited with code:', code);
+      console.log('Output:', output);
+      console.log('Error output:', errorOutput);
+
+      if (code === 0) {
+        try {
+          // Try to extract JSON from the output (look for the last JSON object)
+          const lines = output.split('\n');
+          let jsonLine = '';
+          
+          // Find the last line that looks like JSON
+          for (let i = lines.length - 1; i >= 0; i--) {
+            const line = lines[i].trim();
+            if (line.startsWith('{') && line.endsWith('}')) {
+              jsonLine = line;
+              break;
+            }
+          }
+          
+          if (jsonLine) {
+            const result = JSON.parse(jsonLine);
+            res.json(result);
+          } else {
+            // If no JSON found, assume success if no error output
+            if (!errorOutput || errorOutput.trim() === '') {
+              res.json({ 
+                success: true, 
+                message: 'Automation completed successfully',
+                output: output
+              });
+            } else {
+              res.json({ 
+                success: false, 
+                error: 'No JSON result found',
+                output: output,
+                errorOutput: errorOutput
+              });
+            }
+          }
+        } catch (e) {
+          res.json({ 
+            success: false, 
+            error: 'Failed to parse result',
+            output: output,
+            errorOutput: errorOutput,
+            parseError: e.message
+          });
+        }
+      } else {
+        res.json({ 
+          success: false, 
+          error: 'Automation process failed',
+          output: output,
+          errorOutput: errorOutput
+        });
+      }
+    });
+
+  } catch (error) {
+    console.error('Automation error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Clear makeup exam session
+app.post('/api/makeup/clear', (req, res) => {
+  try {
+    // Kill any active processes
+    for (const [processId, processInfo] of activeProcesses) {
+      if (processInfo.process && !processInfo.process.killed) {
+        processInfo.process.kill();
+      }
+    }
+    activeProcesses.clear();
+
+    res.json({ 
+      success: true, 
+      message: 'Makeup exam session cleared' 
+    });
+
+  } catch (error) {
+    console.error('Clear error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
 });
 
 // Clear login session

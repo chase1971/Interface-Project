@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import D2LInterface from "./pages/D2LInterface";
+import MakeupExamInterface from "./pages/MakeupExamInterface";
 
 function App() {
   return (
@@ -9,6 +10,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/d2l" element={<D2LInterface />} />
+        <Route path="/makeup" element={<MakeupExamInterface />} />
       </Routes>
     </Router>
   );
