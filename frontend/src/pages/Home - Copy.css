@@ -1,0 +1,129 @@
+/* GENERAL PAGE STYLE */
+.home-container {
+  font-family: "Arial", sans-serif;
+  background-color: #ffffff;
+  color: #002e5d; /* Lone Star Blue */
+  text-align: center;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* HEADER */
+.header {
+  background-color: #ffffff;
+  border-bottom: 6px solid #002e5d;
+  color: #002e5d;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.logo {
+  height: 70px;
+}
+
+.title {
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+/* SPLIT CONTAINER */
+.split-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+  padding: 3rem 10%;
+  box-sizing: border-box;
+  flex: 1;
+}
+
+/* PANELS */
+.split {
+  flex: 1;
+  padding: 2rem;
+}
+
+.left-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  border-right: 4px solid #002e5d;
+}
+
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+
+/* PANEL HEADERS */
+.panel-header h2 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 1.5rem;
+}
+
+/* BUTTONS */
+.menu-button {
+  font-size: 1.3rem;
+  font-weight: bold;
+  padding: 1rem 2rem;
+  border: none;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: all 0.3s ease;
+  width: 220px;
+}
+
+.menu-button.blue {
+  background-color: #003768; /* Lone Star Blue PMS 540 */
+  color: #ffffff;
+}
+
+.menu-button.blue:hover {
+  background-color: #004a8f;
+}
+
+.menu-button.red {
+  background-color: #b30838; /* Lone Star Red PMS 201 */
+  color: #ffffff;
+}
+
+.menu-button.red:hover {
+  background-color: #c91646;
+}
+
+/* FOOTER */
+.footer {
+  background-color: #002e5d;
+  color: white;
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+/* RESPONSIVE LAYOUT */
+@media (max-width: 900px) {
+  .split-container {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .left-panel,
+  .right-panel {
+    border: none;
+    align-items: center;
+  }
+
+  .menu-button {
+    width: 80%;
+    margin-bottom: 2rem;
+  }
+}

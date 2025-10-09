@@ -1,0 +1,303 @@
+/* === D2L INTERFACE STYLING === */
+/* Based on the Python GUI design with futuristic theme */
+
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Rajdhani:wght@400;600&display=swap");
+
+:root {
+  --bg-dark: #0d1117;
+  --bg-panel: #111827;
+  --accent-blue: #00b3ff;
+  --accent-red: #ff0055;
+  --accent-green: #4CAF50;
+  --accent-glow: rgba(0, 179, 255, 0.4);
+  --text-main: #e2e8f0;
+  --text-dim: #94a3b8;
+  --divider: rgba(0, 179, 255, 0.2);
+  --button-bg: #f5f5f5;
+  --button-hover: #e0e0e0;
+  --selected-bg: #90EE90;
+}
+
+.d2l-container {
+  font-family: "Rajdhani", sans-serif;
+  background: radial-gradient(circle at top right, #0f172a 0%, #000000 100%);
+  color: var(--text-main);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+}
+
+/* HEADER */
+.d2l-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 500px;
+  border-bottom: 2px solid var(--divider);
+  background: rgba(13, 17, 23, 0.9);
+  box-shadow: 0 0 15px var(--accent-glow);
+  border-radius: 12px 12px 0 0;
+  margin-bottom: 0;
+}
+
+.d2l-logo {
+  height: 50px;
+  filter: drop-shadow(0 0 10px var(--accent-blue));
+}
+
+.d2l-title {
+  font-family: "Orbitron", sans-serif;
+  font-weight: 800;
+  font-size: 1.4rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--accent-blue);
+  text-shadow: 0 0 10px var(--accent-blue);
+}
+
+/* MAIN CONTENT */
+.d2l-main {
+  width: 100%;
+  max-width: 500px;
+  background: var(--bg-panel);
+  border-radius: 0 0 12px 12px;
+  box-shadow: 0 0 15px rgba(0, 179, 255, 0.15);
+  border: 1px solid var(--divider);
+  border-top: none;
+}
+
+.d2l-content {
+  padding: 20px;
+}
+
+/* SECTIONS */
+.d2l-section {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: rgba(13, 17, 23, 0.5);
+  border-radius: 8px;
+  border: 1px solid var(--divider);
+}
+
+.section-title {
+  font-family: "Orbitron", sans-serif;
+  font-size: 1.1rem;
+  color: var(--accent-blue);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 15px;
+  text-shadow: 0 0 5px var(--accent-glow);
+}
+
+/* LOGIN BUTTON */
+.login-btn {
+  font-family: "Arial", sans-serif;
+  font-weight: bold;
+  font-size: 0.9rem;
+  background: #2196F3;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  height: 35px;
+}
+
+.login-btn:hover:not(.disabled) {
+  background: #1976D2;
+  box-shadow: 0 0 10px rgba(33, 150, 243, 0.5);
+}
+
+.login-btn.disabled {
+  background: gray;
+  cursor: not-allowed;
+}
+
+/* CLASS BUTTONS */
+.class-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.class-btn {
+  font-family: "Arial", sans-serif;
+  font-size: 0.8rem;
+  background: var(--button-bg);
+  color: #333;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  height: 30px;
+}
+
+.class-btn:hover {
+  background: var(--button-hover);
+  box-shadow: 0 0 5px rgba(0, 179, 255, 0.3);
+}
+
+.class-btn.selected {
+  background: var(--selected-bg);
+  border-color: #4CAF50;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.4);
+}
+
+/* CSV UPLOAD */
+.csv-upload {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.file-input {
+  display: none;
+}
+
+.file-label {
+  font-family: "Arial", sans-serif;
+  font-size: 0.9rem;
+  background: #f5f5f5;
+  color: #333;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.file-label:hover {
+  background: #e0e0e0;
+  box-shadow: 0 0 5px rgba(0, 179, 255, 0.3);
+}
+
+.update-btn {
+  font-family: "Arial", sans-serif;
+  font-weight: bold;
+  font-size: 0.9rem;
+  background: var(--accent-green);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.update-btn:hover:not(:disabled) {
+  background: #45a049;
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+}
+
+.update-btn:disabled {
+  background: gray;
+  cursor: not-allowed;
+}
+
+.exit-btn {
+  font-family: "Arial", sans-serif;
+  font-size: 0.9rem;
+  background: #f5f5f5;
+  color: #333;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.exit-btn:hover {
+  background: #e0e0e0;
+  box-shadow: 0 0 5px rgba(0, 179, 255, 0.3);
+}
+
+/* STATUS */
+.status-section {
+  margin: 15px 0;
+  text-align: center;
+}
+
+.status-text {
+  font-family: "Arial", sans-serif;
+  font-size: 0.8rem;
+  margin: 0;
+  padding: 8px;
+  border-radius: 4px;
+  background: rgba(13, 17, 23, 0.3);
+}
+
+.status-text.gray {
+  color: gray;
+}
+
+.status-text.blue {
+  color: #2196F3;
+}
+
+.status-text.green {
+  color: #4CAF50;
+}
+
+.status-text.orange {
+  color: #FF9800;
+}
+
+.status-text.red {
+  color: #f44336;
+}
+
+/* CLEAR LOGIN */
+.clear-section {
+  text-align: center;
+  margin-top: 15px;
+}
+
+.clear-btn {
+  font-family: "Arial", sans-serif;
+  font-size: 0.9rem;
+  background: #f5f5f5;
+  color: #333;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.clear-btn:hover {
+  background: #e0e0e0;
+  box-shadow: 0 0 5px rgba(0, 179, 255, 0.3);
+}
+
+/* RESPONSIVE */
+@media (max-width: 600px) {
+  .d2l-container {
+    padding: 10px;
+  }
+  
+  .class-buttons {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .csv-upload {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .csv-upload > * {
+    width: 100%;
+    text-align: center;
+  }
+}
