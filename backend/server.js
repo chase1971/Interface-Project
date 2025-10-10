@@ -22,7 +22,8 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + file.originalname);
+    // Keep original filename without timestamp prefix
+    cb(null, file.originalname);
   }
 });
 
@@ -55,8 +56,8 @@ app.post('/api/d2l/login', (req, res) => {
     // Use the system's default browser to open D2L (like the original Python GUI)
     const { exec } = require('child_process');
     
-    // Open Chrome browser with D2L login URL (new window, positioned on second screen)
-    exec(`start "" /max chrome "${classUrl}"`, (error, stdout, stderr) => {
+    // Open Chrome browser with D2L login URL (new window, positioned on left secondary monitor)
+    exec(`start "" /max chrome --window-position=-1920,0 --window-size=1920,1080 "${classUrl}"`, (error, stdout, stderr) => {
       if (error) {
         console.error('Browser open error:', error);
         return res.status(500).json({ 
@@ -88,8 +89,8 @@ app.post('/api/d2l/select-class', (req, res) => {
     // Use the system's default browser to open the class URL
     const { exec } = require('child_process');
     
-    // Open Chrome browser with class URL (new window, positioned on second screen)
-    exec(`start "" /max chrome "${classUrl}"`, (error, stdout, stderr) => {
+    // Open Chrome browser with class URL (new window, positioned on left secondary monitor)
+    exec(`start "" /max chrome --window-position=-1920,0 --window-size=1920,1080 "${classUrl}"`, (error, stdout, stderr) => {
       if (error) {
         console.error('Browser open error:', error);
         return res.status(500).json({ 
@@ -114,14 +115,15 @@ app.post('/api/d2l/select-class', (req, res) => {
   }
 });
 
-// Open file browser to D2L Macro directory
-app.get('/api/d2l/browse', (req, res) => {
+// Open file browser to specified directory
+app.post('/api/d2l/browse', (req, res) => {
   try {
-    const d2lMacroPath = path.join(__dirname, '..', '..', 'D2L Macro');
+    const { directory } = req.body;
+    const targetDirectory = directory || path.join(__dirname, '..', '..', 'D2L Macro');
     
-    // Open Windows Explorer to the D2L Macro directory (handle spaces properly)
+    // Open Windows Explorer to the specified directory (handle spaces properly)
     const { exec } = require('child_process');
-    exec(`start "" "${d2lMacroPath}"`, (error, stdout, stderr) => {
+    exec(`start "" "${targetDirectory}"`, (error, stdout, stderr) => {
       if (error) {
         console.error('Explorer open error:', error);
         return res.status(500).json({ 
@@ -132,8 +134,8 @@ app.get('/api/d2l/browse', (req, res) => {
       
       res.json({ 
         success: true, 
-        message: 'File browser opened to D2L Macro directory',
-        directory: d2lMacroPath
+        message: 'File browser opened to specified directory',
+        directory: targetDirectory
       });
     });
 

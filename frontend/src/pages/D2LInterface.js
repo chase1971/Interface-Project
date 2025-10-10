@@ -132,8 +132,16 @@ function D2LInterface() {
       setStatus("Opening file browser...");
       setStatusColor("blue");
       
-      // Open Windows Explorer to the D2L Macro directory
-      const response = await fetch('http://localhost:5000/api/d2l/browse');
+      // Open Windows Explorer to the Email Templates directory
+      const response = await fetch('http://localhost:5000/api/d2l/browse', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          directory: 'C:\\Users\\chase\\My Drive\\Rosters etc\\Email Templates, Assignment Dates'
+        })
+      });
       const result = await response.json();
       
       if (result.success) {

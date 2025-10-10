@@ -37,6 +37,7 @@ class WebAutomationAgent:
         print(f"[STATUS] {text}", file=sys.stderr)
 
     def start_async_loop(self):
+        """Start the asyncio event loop in a separate thread"""
         def run_loop():
             self.loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self.loop)
@@ -45,6 +46,7 @@ class WebAutomationAgent:
         self.thread.start()
 
     def load_csv_data(self):
+        """Load CSV data exactly like agent.py does"""
         try:
             if len(sys.argv) > 1:
                 macro_dir = sys.argv[1]
@@ -130,6 +132,7 @@ class WebAutomationAgent:
             self.log("Starting browser automation...")
             self.playwright = await async_playwright().start()
 
+            # Try to connect to existing browser first
             try:
                 await asyncio.sleep(0.5)
                 browser = await self.playwright.chromium.connect_over_cdp("http://localhost:9222")
@@ -142,7 +145,7 @@ class WebAutomationAgent:
                     self.context = await browser.new_context()
                     self.page = await self.context.new_page()
             except Exception as e:
-                self.log(f"❌ Could not connect to existing browser: {e}")
+                self.log(f"❌ Could not connect: {e}")
                 browser = await self.playwright.chromium.launch(
                     headless=False,
                     args=['--remote-debugging-port=9222', '--user-data-dir=%TEMP%\\chrome_debug']
@@ -150,12 +153,14 @@ class WebAutomationAgent:
                 self.context = await browser.new_context()
                 self.page = await self.context.new_page()
 
+            # Navigate to form page
             self.log("🌐 Navigating to form page...")
             await self.page.goto("https://my.lonestar.edu/psp/ihprd/EMPLOYEE/EMPL/c/LSC_TCR.LSC_TCRFORMS.GBL", wait_until='networkidle', timeout=15000)
             await self.page.wait_for_load_state('networkidle')
             self.log("✅ Page loaded, waiting for frames...")
-            await asyncio.sleep(3)
+            await asyncio.sleep(3)  # Give frames time to load
 
+            # Group students
             class_groups = {}
             for s in self.students:
                 class_groups.setdefault(s['Class'], []).append(s)
@@ -167,23 +172,33 @@ class WebAutomationAgent:
                     await self.page.reload()
                     await self.page.wait_for_load_state('domcontentloaded')
 
+                # Try to find the TargetContent iframe with better debugging
                 self.log("🔍 Looking for TargetContent iframe...")
                 frame = self.page.frame(name="TargetContent")
+                
                 if not frame:
+                    # List all available frames for debugging
+                    self.log("📋 Available frames:")
                     for f in self.page.frames:
                         self.log(f"  - Frame: {f.name or 'unnamed'} (URL: {f.url})")
-                    for alt_name in ["TargetContent", "ptModFrame_", "ptFrame_"]:
+                    
+                    # Try alternative frame names
+                    alternative_frames = ["TargetContent", "ptModFrame_", "ptFrame_"]
+                    for alt_name in alternative_frames:
                         frame = self.page.frame(name=alt_name)
                         if frame:
                             self.log(f"✅ Found alternative frame: {alt_name}")
                             break
+                    
                     if not frame:
                         self.log("❌ ERROR: Could not find any suitable iframe")
                         continue
 
+                # Capture exam name from file path
                 if self.exam_file_path:
                     self.exam = os.path.splitext(os.path.basename(self.exam_file_path))[0]
 
+                # Fill form fields
                 await frame.wait_for_selector("#LSC_TCRFRMA_VW_LSC_TERM")
                 await frame.fill("#LSC_TCRFRMA_VW_LSC_TERM", self.term)
                 await frame.fill("#LSC_TCRFRMA_VW_LSC_TCTESTNAME", self.exam)
@@ -199,6 +214,7 @@ class WebAutomationAgent:
                 await frame.fill("#LSC_TCRFORMS_LSC_TCCRSENBR", class_code)
                 await frame.click("#LSC_TCRFORMS_LSC_TCRINDSTU")
 
+                # Process students
                 for i, student in enumerate(students):
                     magnifier_selector = f"#LSC_TCRFORMSTU_LSC_SEMPLID\\$prompt\\$img\\${i}"
                     await frame.wait_for_selector(magnifier_selector)
@@ -224,42 +240,29 @@ class WebAutomationAgent:
 
                 await frame.check("#LSC_TCRFORMCAMP_LSC_TCRSELECTCAMPU\\$11")
 
-                # File upload fix
+                # File upload
                 try:
                     self.log("📎 Clicking Add Attachment button...")
                     await frame.click("#LSC_TCRFIATT_WK_ATTACHADD", timeout=10000)
-                    self.log("🔍 Add Attachment clicked — waiting for modal iframe...")
+                    await self.page.wait_for_selector("input[type='file']", timeout=5000)
 
-                    modal_frame = None
-                    for _ in range(20):
-                        await asyncio.sleep(0.5)
-                        for f in self.page.frames:
-                            if f.name and f.name.startswith("ptModFrame_"):
-                                modal_frame = f
-                                break
-                        if modal_frame:
-                            break
-
-                    if not modal_frame:
-                        raise Exception("❌ Modal attachment frame not found!")
-
-                    self.log(f"✅ Found modal frame: {modal_frame.name}")
-
-                    file_input = await modal_frame.wait_for_selector("input[type='file']", timeout=10000)
-                    self.log("✅ File input found — uploading file...")
-
+                    # Preserve original name
                     original = pathlib.Path(self.exam_file_path)
                     temp = pathlib.Path(tempfile.gettempdir()) / original.name
                     shutil.copy2(original, temp)
 
+                    file_input = await self.page.query_selector("input[type='file']")
                     await file_input.set_input_files(str(temp))
 
-                    upload_button = await modal_frame.wait_for_selector("#Upload, button:has-text('Upload'), input[id='Upload']", timeout=10000)
-                    await upload_button.click()
-                    self.log("✅ Upload button clicked — waiting for upload completion...")
-
-                    await asyncio.sleep(2)
-                    self.log("✅ File uploaded successfully")
+                    # Wait for and click upload button
+                    await self.page.wait_for_selector("#Upload, button:has-text('Upload')", timeout=5000)
+                    upload_button = await self.page.query_selector("#Upload") or await self.page.query_selector("button:has-text('Upload')")
+                    if upload_button:
+                        await upload_button.click()
+                        await self.page.wait_for_load_state('domcontentloaded', timeout=10000)
+                        self.log("✅ File uploaded successfully")
+                    else:
+                        self.log("❌ Upload button not found")
 
                 except Exception as e:
                     self.log(f"❌ File upload error: {e}")

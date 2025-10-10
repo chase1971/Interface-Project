@@ -225,7 +225,7 @@ function MakeupExamInterface() {
                 className="browse-btn"
                 onClick={handleBrowseExam}
               >
-                Browse Exam File
+                Browse Exam
               </button>
               
               <button 
