@@ -10,7 +10,10 @@ import threading
 import pathlib
 import shutil
 import tempfile
+import subprocess
+from datetime import datetime
 from playwright.async_api import async_playwright
+from docx import Document
 
 # Set UTF-8 encoding for stdout and stderr
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -35,6 +38,55 @@ class WebAutomationAgent:
 
     def update_status(self, text, color="blue"):
         print(f"[STATUS] {text}", file=sys.stderr)
+
+    def open_email_template(self, class_code, exam_date):
+        """Open the appropriate email template and replace the date"""
+        try:
+            # Determine which email template to use based on class code
+            if "1314" in class_code:
+                template_path = r"C:\Users\chase\My Drive\Rosters etc\Email Templates, Assignment Dates\M1314 Make up Exam Automation.docx"
+            elif "1324" in class_code:
+                template_path = r"C:\Users\chase\My Drive\Rosters etc\Email Templates, Assignment Dates\M1324 Make up Exam Automation.docx"
+            else:
+                self.log("⚠️ Unknown class code, using M1314 template as default")
+                template_path = r"C:\Users\chase\My Drive\Rosters etc\Email Templates, Assignment Dates\M1314 Make up Exam Automation.docx"
+            
+            self.log(f"📧 Opening email template: {os.path.basename(template_path)}")
+            self.log(f"📅 Exam date: {exam_date}")
+            
+            # Create a copy of the template with the date replaced
+            temp_path = template_path.replace('.docx', f'_temp_{datetime.now().strftime("%Y%m%d_%H%M%S")}.docx')
+            
+            # Load the document and replace the date
+            doc = Document(template_path)
+            
+            # Replace "Insert Date" with the actual exam date
+            for paragraph in doc.paragraphs:
+                if "Insert Date" in paragraph.text:
+                    paragraph.text = paragraph.text.replace("Insert Date", exam_date)
+                    self.log(f"✅ Replaced 'Insert Date' with '{exam_date}'")
+                
+                # Also replace "[Insert Date]" if it exists with brackets
+                if "[Insert Date]" in paragraph.text:
+                    paragraph.text = paragraph.text.replace("[Insert Date]", exam_date)
+                    self.log(f"✅ Replaced '[Insert Date]' with '{exam_date}'")
+            
+            # Save the modified document
+            doc.save(temp_path)
+            self.log(f"✅ Created modified template: {os.path.basename(temp_path)}")
+            
+            # Open the modified Word document
+            subprocess.Popen(['start', '', temp_path], shell=True)
+            self.log("✅ Email template opened with date replaced")
+            
+        except Exception as e:
+            self.log(f"❌ Error opening email template: {e}")
+            # Fallback: open original template
+            try:
+                subprocess.Popen(['start', '', template_path], shell=True)
+                self.log("📝 Opened original template - please manually replace 'Insert Date'")
+            except:
+                self.log("❌ Failed to open template")
 
     def start_async_loop(self):
         def run_loop():
@@ -127,6 +179,16 @@ class WebAutomationAgent:
 
     async def automate_form(self):
         try:
+            # Open email template FIRST before starting automation
+            if self.students:
+                first_student = self.students[0]
+                class_code = first_student.get('Class', '')
+                exam_date = first_student.get('End Date', '')
+                
+                self.log("📧 Opening email template FIRST...")
+                self.open_email_template(class_code, exam_date)
+                self.log("📧 Email template opened - you can edit it while automation runs")
+            
             self.log("Starting browser automation...")
             self.playwright = await async_playwright().start()
 
