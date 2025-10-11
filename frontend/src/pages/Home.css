@@ -84,58 +84,122 @@
   color: var(--accent-blue);
   letter-spacing: 1px;
   text-transform: uppercase;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
   text-shadow: 0 0 10px var(--accent-glow);
 }
 
-/* BUTTONS */
-.menu-button {
-  font-family: "Orbitron", sans-serif;
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 1.1rem;
-  padding: 1rem 2.5rem;
-  border: 2px solid var(--accent-blue);
-  border-radius: 10px;
-  background: linear-gradient(145deg, #0d1117, #111827);
-  color: var(--accent-blue);
+.panel-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  margin-bottom: 2rem;
+  font-weight: 400;
+}
+
+/* BUTTON GRID */
+.button-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* MENU CARDS */
+.menu-card {
+  font-family: "Rajdhani", sans-serif;
+  background: linear-gradient(145deg, rgba(17, 24, 39, 0.9), rgba(13, 17, 23, 0.95));
+  border: 1px solid var(--accent-blue);
+  border-radius: 8px;
+  padding: 0.9rem 1.1rem;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 0 12px rgba(0, 179, 255, 0.25);
+  box-shadow: 0 0 10px rgba(0, 179, 255, 0.15);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 
-.menu-button:hover {
-  color: #fff;
-  background: var(--accent-blue);
+.menu-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(0, 225, 255, 0.4);
   border-color: #00e1ff;
-  box-shadow: 0 0 25px rgba(0, 225, 255, 0.6);
-  transform: translateY(-3px);
+  background: linear-gradient(145deg, rgba(17, 24, 39, 1), rgba(0, 179, 255, 0.05));
 }
 
-.menu-button.red {
+.card-title {
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--accent-blue);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  line-height: 1.2;
+}
+
+.card-description {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  line-height: 1.3;
+}
+
+/* COLOR VARIANTS */
+.menu-card.red {
   border-color: var(--accent-red);
+  box-shadow: 0 0 10px rgba(255, 0, 85, 0.15);
+}
+
+.menu-card.red .card-title {
   color: var(--accent-red);
-  box-shadow: 0 0 12px rgba(255, 0, 85, 0.25);
 }
 
-.menu-button.red:hover {
-  background: var(--accent-red);
-  color: #fff;
+.menu-card.red:hover {
   border-color: #ff3366;
-  box-shadow: 0 0 25px rgba(255, 0, 85, 0.6);
+  box-shadow: 0 0 20px rgba(255, 0, 85, 0.4);
+  background: linear-gradient(145deg, rgba(17, 24, 39, 1), rgba(255, 0, 85, 0.05));
 }
 
-.menu-button.green {
+.menu-card.green {
   border-color: #4CAF50;
-  color: #4CAF50;
-  box-shadow: 0 0 12px rgba(76, 175, 80, 0.25);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.15);
 }
 
-.menu-button.green:hover {
-  background: #4CAF50;
-  color: #fff;
+.menu-card.green .card-title {
+  color: #4CAF50;
+}
+
+.menu-card.green:hover {
   border-color: #66BB6A;
-  box-shadow: 0 0 25px rgba(76, 175, 80, 0.6);
+  box-shadow: 0 0 20px rgba(76, 175, 80, 0.4);
+  background: linear-gradient(145deg, rgba(17, 24, 39, 1), rgba(76, 175, 80, 0.05));
+}
+
+.menu-card.purple {
+  border-color: #9b59b6;
+  box-shadow: 0 0 10px rgba(155, 89, 182, 0.15);
+}
+
+.menu-card.purple .card-title {
+  color: #9b59b6;
+}
+
+.menu-card.purple:hover {
+  border-color: #b97ddb;
+  box-shadow: 0 0 20px rgba(155, 89, 182, 0.4);
+  background: linear-gradient(145deg, rgba(17, 24, 39, 1), rgba(155, 89, 182, 0.05));
+}
+
+.menu-card.orange {
+  border-color: #ff9800;
+  box-shadow: 0 0 10px rgba(255, 152, 0, 0.15);
+}
+
+.menu-card.orange .card-title {
+  color: #ff9800;
+}
+
+.menu-card.orange:hover {
+  border-color: #ffb74d;
+  box-shadow: 0 0 20px rgba(255, 152, 0, 0.4);
+  background: linear-gradient(145deg, rgba(17, 24, 39, 1), rgba(255, 152, 0, 0.05));
 }
 
 /* FOOTER */
@@ -158,11 +222,19 @@
   }
 
   .split {
-    width: 80%;
+    width: 90%;
     margin-bottom: 2rem;
   }
 
-  .menu-button {
-    width: 100%;
+  .menu-card {
+    padding: 0.8rem 1rem;
+  }
+
+  .card-title {
+    font-size: 0.9rem;
+  }
+
+  .card-description {
+    font-size: 0.75rem;
   }
 }
