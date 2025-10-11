@@ -404,10 +404,90 @@ button:disabled {
   box-shadow: 0 0 12px rgba(0, 225, 255, 0.8);
 }
 
-/* Responsive */
-@media (max-width: 900px) {
+/* RESPONSIVE - SAMSUNG FOLD 7 OPTIMIZED */
+
+/* Folded Phone Mode (Cover Screen - ~360px viewport) */
+@media (max-width: 480px) {
   .quiz-grader-container {
-    padding: 0.8rem;
+    padding: 0.75rem;
+  }
+
+  .quiz-header {
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .quiz-header h1 {
+    font-size: 1.2rem;
+  }
+
+  .back-link {
+    font-size: 0.8rem;
+  }
+
+  .workflow-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .workflow-section {
+    padding: 1rem;
+    min-height: auto;
+  }
+
+  .config-section {
+    gap: 0.6rem;
+  }
+
+  .action-card {
+    padding: 0.9rem;
+    gap: 0.8rem;
+  }
+
+  .action-section h3 {
+    font-size: 0.95rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .form-group label {
+    font-size: 0.85rem;
+  }
+
+  select, .btn {
+    padding: 0.6rem;
+    font-size: 0.85rem;
+  }
+
+  .btn-large {
+    font-size: 0.95rem;
+    padding: 0.9rem;
+  }
+
+  .utility-buttons {
+    gap: 0.6rem;
+  }
+
+  .log-section h4 {
+    font-size: 0.9rem;
+  }
+
+  .log-container {
+    min-height: 100px;
+    max-height: 150px;
+    padding: 0.75rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* Unfolded Tablet Mode (Main Screen - ~656px viewport) */
+@media (min-width: 481px) and (max-width: 768px) {
+  .quiz-grader-container {
+    padding: 1rem;
+  }
+
+  .quiz-header {
+    padding: 1rem;
+    margin-bottom: 1rem;
   }
 
   .quiz-header h1 {
@@ -416,13 +496,53 @@ button:disabled {
 
   .workflow-grid {
     grid-template-columns: 1fr;
+    gap: 1.25rem;
   }
 
   .workflow-section {
-    padding: 1rem;
+    padding: 1.25rem;
+  }
+
+  .action-card {
+    padding: 1.1rem;
+  }
+
+  .action-section h3 {
+    font-size: 1rem;
+  }
+
+  .form-group label {
+    font-size: 0.9rem;
+  }
+
+  select, .btn {
+    padding: 0.7rem;
+    font-size: 0.9rem;
   }
 
   .btn-large {
-    font-size: 0.95rem;
+    font-size: 1rem;
+    padding: 1rem;
+  }
+
+  .log-container {
+    min-height: 120px;
+    max-height: 180px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Small Desktop/Tablet Landscape */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .quiz-grader-container {
+    padding: 1.2rem;
+  }
+
+  .workflow-grid {
+    gap: 1.5rem;
+  }
+
+  .workflow-section {
+    padding: 1.5rem;
   }
 }
