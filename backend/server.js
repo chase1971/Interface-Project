@@ -1109,7 +1109,8 @@ app.use((error, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, 'localhost', () => {
   console.log(`D2L Backend API running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/api/health`);
+  console.log(`🔒 Server bound to localhost only - not accessible from network`);
 });
