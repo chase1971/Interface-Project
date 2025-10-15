@@ -36,11 +36,12 @@ router.post('/login', (req, res) => {
   try {
     const { classUrl } = req.body;
     
-    // Use Playwright to handle browser (like agent.py)
+    // Launch Chrome directly with shared browser data (exactly like makeup exam macro)
     const { exec } = require('child_process');
-    const cliScript = path.join(__dirname, '..', '..', '..', 'D2L Macro', 'd2l_playwright_processor.py');
+    const userDataDir = path.join(__dirname, '..', '..', '..', 'Shared-Browser-Data', 'D2L-Macro-browser_data');
     
-    exec(`python "${cliScript}" "login" "${classUrl}"`, (error, stdout, stderr) => {
+    // Start Chrome with persistent profile AND debugging enabled - browser stays open
+    exec(`start "" /max chrome --user-data-dir="${userDataDir}" --remote-debugging-port=9223 --window-position=100,100 --window-size=1920,1080 "${classUrl}"`, (error, stdout, stderr) => {
       if (error) {
         console.error('Browser launch error:', error);
         return res.status(500).json({ 
@@ -68,11 +69,21 @@ router.post('/select-class', (req, res) => {
   try {
     const { classUrl } = req.body;
     
-    // Just store the class URL - Playwright will handle navigation
-    res.json({ 
-      success: true, 
-      message: 'Class URL stored - Ready for CSV processing',
-      classUrl: classUrl
+    // Open the class URL in the existing Chrome browser (like makeup exam macro)
+    const { exec } = require('child_process');
+    exec(`start "" "${classUrl}"`, (error, stdout, stderr) => {
+      if (error) {
+        console.error('Class navigation error:', error);
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Failed to navigate to class: ' + error.message 
+        });
+      }
+      res.json({ 
+        success: true, 
+        message: 'Class opened in browser - Ready for CSV processing',
+        classUrl: classUrl
+      });
     });
 
   } catch (error) {
@@ -252,12 +263,11 @@ router.post('/browse', (req, res) => {
 // Clear login session
 router.post('/clear', (req, res) => {
   try {
-    // Clear Chrome profile data
-    const tempDir = require('os').tmpdir();
-    const profileDir = path.join(tempDir, 'd2l_chrome_profile');
+    // Clear Chrome profile data from shared directory
+    const userDataDir = path.join(__dirname, '..', '..', '..', 'Shared-Browser-Data', 'D2L-Macro-browser_data');
     
-    if (fs.existsSync(profileDir)) {
-      fs.rmSync(profileDir, { recursive: true, force: true });
+    if (fs.existsSync(userDataDir)) {
+      fs.rmSync(userDataDir, { recursive: true, force: true });
     }
 
     res.json({ 

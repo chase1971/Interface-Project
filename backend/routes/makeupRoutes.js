@@ -37,10 +37,10 @@ router.post('/login', (req, res) => {
   try {
     // Launch Chrome with persistent profile for exam automation
     const { exec } = require('child_process');
-    const userDataDir = path.join(__dirname, '..', '..', '..', 'Make-Up-Exam-Macro', 'browser_data');
+    const userDataDir = path.join(__dirname, '..', '..', '..', '..', 'Shared-Browser-Data', 'Make-Up-Exam-Macro-browser_data');
     
     // Start Chrome with persistent profile AND debugging enabled - browser stays open
-    exec(`start "" /max chrome --user-data-dir="${userDataDir}" --remote-debugging-port=9222 --window-position=-1920,0 --window-size=1920,1080 "https://my.lonestar.edu/psp/ihprd/EMPLOYEE/EMPL/c/LSC_TCR.LSC_TCRFORMS.GBL"`, (error, stdout, stderr) => {
+    exec(`start "" /max chrome --user-data-dir="${userDataDir}" --remote-debugging-port=9222 --window-position=100,100 --window-size=1920,1080 "https://my.lonestar.edu/psp/ihprd/EMPLOYEE/EMPL/c/LSC_TCR.LSC_TCRFORMS.GBL"`, (error, stdout, stderr) => {
       if (error) {
         console.error('Browser launch error:', error);
         return res.status(500).json({ 
