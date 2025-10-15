@@ -38,7 +38,7 @@ router.post('/login', (req, res) => {
     
     // Launch Chrome directly with shared browser data (exactly like makeup exam macro)
     const { exec } = require('child_process');
-    const userDataDir = path.join(__dirname, '..', '..', '..', 'Shared-Browser-Data', 'D2L-Macro-browser_data');
+    const userDataDir = path.join(__dirname, '..', '..', '..', 'Make-Up-Exam-Macro', 'browser_data');
     
     // Start Chrome with persistent profile AND debugging enabled - browser stays open
     exec(`start "" /max chrome --user-data-dir="${userDataDir}" --remote-debugging-port=9223 --window-position=100,100 --window-size=1920,1080 "${classUrl}"`, (error, stdout, stderr) => {
@@ -137,7 +137,7 @@ router.post('/process', (req, res) => {
     }
 
     // Use the dedicated CLI script
-    const cliScript = path.join(__dirname, '..', '..', '..', 'D2L Macro', 'd2l_playwright_processor.py');
+    const cliScript = path.join(__dirname, '..', '..', '..', 'D2L-Macro', 'd2l_playwright_processor.py');
     
     if (!fs.existsSync(cliScript)) {
       return res.status(404).json({ 
@@ -152,7 +152,7 @@ router.post('/process', (req, res) => {
 
     // Execute the CLI script with new command structure
     const pythonProcess = spawn('python', [cliScript, 'process', classUrl, csvFilePath], {
-      cwd: path.join(__dirname, '..', '..', 'D2L Macro'),
+      cwd: path.join(__dirname, '..', '..', 'D2L-Macro'),
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
     });
@@ -231,7 +231,7 @@ router.post('/process', (req, res) => {
 router.post('/browse', (req, res) => {
   try {
     const { directory } = req.body;
-    const targetDirectory = directory || path.join(__dirname, '..', '..', 'D2L Macro');
+    const targetDirectory = directory || path.join(__dirname, '..', '..', 'D2L-Macro');
     
     // Open Windows Explorer to the specified directory
     const { exec } = require('child_process');
@@ -264,7 +264,7 @@ router.post('/browse', (req, res) => {
 router.post('/clear', (req, res) => {
   try {
     // Clear Chrome profile data from shared directory
-    const userDataDir = path.join(__dirname, '..', '..', '..', 'Shared-Browser-Data', 'D2L-Macro-browser_data');
+    const userDataDir = path.join(__dirname, '..', '..', '..', 'Make-Up-Exam-Macro', 'browser_data');
     
     if (fs.existsSync(userDataDir)) {
       fs.rmSync(userDataDir, { recursive: true, force: true });

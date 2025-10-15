@@ -7,12 +7,12 @@ objShell.Run "taskkill /F /IM node.exe", 0, True
 WScript.Sleep 2000
 
 ' Start backend server
-strBackendCommand = "cd /d ""C:\Users\chase\My Drive\scripts\School Scripts\Interface-Project\backend"" && node server.js"
+strBackendCommand = "cd /d ""C:\Users\chase\Documents\School Scrips\Interface-Project\backend"" && node server.js"
 objShell.Run "cmd /k """ & strBackendCommand & """", 1, False
 
 ' Wait a moment for backend to start
 WScript.Sleep 3000
 
 ' Start frontend server
-strFrontendCommand = "cd /d ""C:\Users\chase\My Drive\scripts\School Scripts\Interface-Project\frontend"" && npm start"
+strFrontendCommand = "cd /d ""C:\Users\chase\Documents\School Scrips\Interface-Project\frontend"" && npm start"
 objShell.Run "cmd /k """ & strFrontendCommand & """", 1, False

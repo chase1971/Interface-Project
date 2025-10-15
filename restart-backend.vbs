@@ -7,7 +7,7 @@ objShell.Run "taskkill /F /IM node.exe", 0, True
 WScript.Sleep 2000
 
 ' Change to backend directory
-objShell.CurrentDirectory = "C:\Users\chase\My Drive\scripts\School Scripts\Interface-Project\backend"
+objShell.CurrentDirectory = "C:\Users\chase\Documents\School Scrips\Interface-Project\backend"
 
 ' Start the server invisibly (no command window)
 objShell.Run "node server.js", 0, False

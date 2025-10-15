@@ -7,7 +7,7 @@ objShell.Run "taskkill /F /IM node.exe", 0, True
 WScript.Sleep 2000
 
 ' Change to the frontend directory and start the server
-strCommand = "cd /d ""C:\Users\chase\My Drive\scripts\School Scripts\Interface-Project\frontend"" && npm start"
+strCommand = "cd /d ""C:\Users\chase\Documents\School Scrips\Interface-Project\frontend"" && npm start"
 
 ' Start the server in a new command window
 objShell.Run "cmd /k """ & strCommand & """", 1, False
