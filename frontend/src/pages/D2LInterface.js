@@ -129,7 +129,7 @@ function D2LInterface() {
 
   const handleBrowseClick = async () => {
     try {
-      setStatus("Opening file browser...");
+      setStatus("Opening folder...");
       setStatusColor("blue");
       
       // Open Windows Explorer to the Email Templates directory
@@ -145,30 +145,38 @@ function D2LInterface() {
       const result = await response.json();
       
       if (result.success) {
-        setStatus("File browser opened - Select your CSV file");
+        setStatus("Folder opened - Drag and drop your CSV file or click to select");
         setStatusColor("green");
-        
-        // Now show the file input for CSV selection
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.csv';
-        input.style.display = 'none';
-        
-        input.onchange = (e) => {
-          const file = e.target.files[0];
-          if (file) {
-            handleFileUpload({ target: { files: [file] } });
-          }
-        };
-        
-        input.click();
       } else {
-        setStatus("Failed to open file browser: " + result.error);
+        setStatus("Failed to open folder: " + result.error);
         setStatusColor("red");
       }
     } catch (error) {
       setStatus("Browse error: " + error.message);
       setStatusColor("red");
+    }
+  };
+
+  const handleFileClick = () => {
+    // Trigger the hidden file input for manual selection
+    const fileInput = document.getElementById('csv-file');
+    if (fileInput) {
+      fileInput.click();
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      handleFileUpload({ target: { files: [files[0]] } });
     }
   };
 
@@ -297,12 +305,28 @@ function D2LInterface() {
                 onChange={handleFileUpload}
                 className="file-input"
                 id="csv-file"
-                webkitdirectory="false"
-                directory=""
-                nwdirectory=""
               />
+              <div 
+                className="drop-zone"
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onClick={handleFileClick}
+                style={{ 
+                  border: '2px dashed #00b3ff', 
+                  borderRadius: '8px', 
+                  padding: '20px', 
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  marginBottom: '10px',
+                  background: 'rgba(0, 179, 255, 0.05)'
+                }}
+              >
+                <p style={{ margin: 0, color: '#00b3ff' }}>
+                  {csvFile ? `Selected: ${csvFile}` : 'Click to select CSV or drag and drop here'}
+                </p>
+              </div>
               <button className="file-label" onClick={handleBrowseClick}>
-                Browse
+                Open Folder
               </button>
               <button 
                 className="update-btn"

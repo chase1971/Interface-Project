@@ -181,11 +181,11 @@ function QuizGrader() {
                   className="form-select"
                 >
                   <option value="">Choose a class...</option>
-                  <option value="MW 11-1220  FM 4103">MW 11-1220 FM 4103</option>
-                  <option value="MW 930-1050 CA 4105">MW 930-1050 CA 4105</option>
-                  <option value="TTH 8-920  CA 4201">TTH 8-920 CA 4201</option>
-                  <option value="TTH 11-1220 FM 4202">TTH 11-1220 FM 4202</option>
-                  <option value="TTH 930-1050 CA 4203">TTH 930-1050 CA 4203</option>
+                  <option value="MW 11-1220  FM 4103">FM 4103 (MW 11:00-12:20)</option>
+                  <option value="MW 930-1050 CA 4105">CA 4105 (MW 9:30-10:50)</option>
+                  <option value="TTH 8-920  CA 4201">CA 4201 (TTH 8:00-9:20)</option>
+                  <option value="TTH 11-1220 FM 4202">FM 4202 (TTH 11:00-12:20)</option>
+                  <option value="TTH 930-1050 CA 4203">CA 4203 (TTH 9:30-10:50)</option>
                 </select>
                 <button className="btn-secondary" onClick={handleLoadClasses}>
                   Refresh

@@ -159,10 +159,30 @@ function MakeupExamInterface() {
         setStatus("Automation completed successfully");
         setStatusColor("green");
         addLogMessage("All students processed successfully.");
+        
+        // Display all debug output from Python script
+        if (result.output) {
+          const debugLines = result.output.split('\n').filter(line => line.trim());
+          debugLines.forEach(line => {
+            if (line.includes('[LOG]') || line.includes('[STATUS]')) {
+              addLogMessage(line);
+            }
+          });
+        }
       } else {
         setStatus("Automation failed: " + result.error);
         setStatusColor("red");
         addLogMessage("Automation failed: " + result.error);
+        
+        // Display all debug output from Python script
+        if (result.details) {
+          const debugLines = result.details.split('\n').filter(line => line.trim());
+          debugLines.forEach(line => {
+            if (line.includes('[LOG]') || line.includes('[STATUS]')) {
+              addLogMessage(line);
+            }
+          });
+        }
       }
     } catch (error) {
       setStatus("Automation error: " + error.message);

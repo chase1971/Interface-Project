@@ -86,13 +86,13 @@ function FileExtractor() {
     }
   };
 
-  // Class options
+  // Class options - values must match actual folder names in "Rosters etc"
   const classOptions = [
-    { value: 'CA 4105', label: 'CA 4105 (MW 9:30-10:50)' },
-    { value: 'CA 4201', label: 'CA 4201 (TTH 8:00-9:20)' },
-    { value: 'CA 4203', label: 'CA 4203 (TTH 9:30-10:50)' },
-    { value: 'FM 4103', label: 'FM 4103 (MW 11:00-12:20)' },
-    { value: 'FM 4202', label: 'FM 4202 (TTH 11:00-12:20)' }
+    { value: 'MW 11-1220  FM 4103', label: 'FM 4103 (MW 11:00-12:20)' },
+    { value: 'MW 930-1050 CA 4105', label: 'CA 4105 (MW 9:30-10:50)' },
+    { value: 'TTH 8-920  CA 4201', label: 'CA 4201 (TTH 8:00-9:20)' },
+    { value: 'TTH 11-1220 FM 4202', label: 'FM 4202 (TTH 11:00-12:20)' },
+    { value: 'TTH 930-1050 CA 4203', label: 'CA 4203 (TTH 9:30-10:50)' }
   ];
 
   return (
