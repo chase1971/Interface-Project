@@ -63,13 +63,18 @@ router.post('/process', (req, res) => {
       });
     }
 
-    // Path to the process quiz CLI script
-    const scriptPath = path.join(__dirname, '..', '..', 'Quiz-extraction', 'process_quiz_cli.py');
+    // Path to the process quiz CLI script - using absolute path
+    console.log('DEBUG: __dirname =', __dirname);
+    console.log('DEBUG: path.resolve(__dirname) =', path.resolve(__dirname));
+    const scriptPath = path.resolve(__dirname, '..', '..', '..', 'Quiz-extraction', 'process_quiz_cli.py');
+    
+    console.log('Looking for script at:', scriptPath);
+    console.log('Script exists:', fs.existsSync(scriptPath));
     
     if (!fs.existsSync(scriptPath)) {
       return res.status(404).json({ 
         success: false, 
-        error: 'Grading processor script not found' 
+        error: `Grading processor script not found at ${scriptPath}` 
       });
     }
 
@@ -143,8 +148,8 @@ router.post('/extract-grades', (req, res) => {
       });
     }
 
-    // Path to the extract grades CLI script
-    const scriptPath = path.join(__dirname, '..', '..', 'Quiz-extraction', 'extract_grades_cli.py');
+    // Path to the extract grades CLI script - using absolute path
+    const scriptPath = path.resolve(__dirname, '..', '..', '..', 'Quiz-extraction', 'extract_grades_cli.py');
     
     if (!fs.existsSync(scriptPath)) {
       return res.status(404).json({ 
@@ -223,8 +228,8 @@ router.post('/clear-data', (req, res) => {
       });
     }
 
-    // Path to the cleanup CLI script
-    const scriptPath = path.join(__dirname, '..', '..', 'Quiz-extraction', 'cleanup_data_cli.py');
+    // Path to the cleanup CLI script - using absolute path
+    const scriptPath = path.resolve(__dirname, '..', '..', '..', 'Quiz-extraction', 'cleanup_data_cli.py');
     
     if (!fs.existsSync(scriptPath)) {
       return res.status(404).json({ 

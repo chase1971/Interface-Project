@@ -21,5 +21,3 @@ WScript.Sleep 3000
 WshShell.CurrentDirectory = strScriptPath & "\frontend"
 WshShell.Run "cmd /c npm start", 0, False
 
-' Show success message
-WScript.Echo "Servers started invisibly!" & vbCrLf & "Backend: http://localhost:5000" & vbCrLf & "Frontend: http://localhost:3000"

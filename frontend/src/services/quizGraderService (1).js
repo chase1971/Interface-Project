@@ -1,137 +1,120 @@
-// Quiz Grader Service
-// Handles API calls to the backend for quiz grading functionality
+import { getApiBaseUrl } from '../config';
 
-const API_BASE_URL = 'http://localhost:5000/api';
-
+/**
+ * List available classes from the Rosters etc folder
+ */
 export const listClasses = async (drive) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/quiz/list-classes`, {
+    const API_BASE_URL = await getApiBaseUrl();
+    const response = await fetch(`${API_BASE_URL}/api/quiz/list-classes`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ drive })
+      body: JSON.stringify({ drive }),
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    return result;
+    const data = await response.json();
+    return data;
   } catch (error) {
-    console.error('List classes service error:', error);
+    console.error('List classes error:', error);
     return {
       success: false,
-      error: error.message || 'Failed to list classes'
+      error: error.message || 'Failed to list classes',
     };
   }
 };
 
-export const processQuizzes = async (drive, selectedClass, addLog) => {
+/**
+ * Process quizzes (extract Canvas ZIP, combine PDFs, prepare for grading)
+ */
+export const processQuizzes = async (drive, className, onLog) => {
   try {
-    addLog('📡 Sending process request to backend...');
-    
-    const response = await fetch(`${API_BASE_URL}/quiz/process`, {
+    const API_BASE_URL = await getApiBaseUrl();
+    const response = await fetch(`${API_BASE_URL}/api/quiz/process`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        drive,
-        className: selectedClass
-      })
+      body: JSON.stringify({ drive, className }),
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
+    const data = await response.json();
     
-    // Log any messages from the backend
-    if (result.logs) {
-      result.logs.forEach(message => addLog(message));
+    // If logs are provided, call the onLog callback for each log line
+    if (data.logs && onLog) {
+      data.logs.forEach(log => onLog(log));
     }
     
-    return result;
+    return data;
   } catch (error) {
-    console.error('Process quizzes service error:', error);
+    console.error('Process quizzes error:', error);
     return {
       success: false,
-      error: error.message || 'Failed to process quizzes'
+      error: error.message || 'Failed to process quizzes',
     };
   }
 };
 
-export const extractGrades = async (drive, selectedClass, addLog) => {
+/**
+ * Extract grades from graded PDF using OCR
+ */
+export const extractGrades = async (drive, className, onLog) => {
   try {
-    addLog('📡 Sending grade extraction request to backend...');
-    
-    const response = await fetch(`${API_BASE_URL}/quiz/extract-grades`, {
+    const API_BASE_URL = await getApiBaseUrl();
+    const response = await fetch(`${API_BASE_URL}/api/quiz/extract-grades`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        drive,
-        className: selectedClass
-      })
+      body: JSON.stringify({ drive, className }),
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
+    const data = await response.json();
     
-    // Log any messages from the backend
-    if (result.logs) {
-      result.logs.forEach(message => addLog(message));
+    // If logs are provided, call the onLog callback for each log line
+    if (data.logs && onLog) {
+      data.logs.forEach(log => onLog(log));
     }
     
-    return result;
+    return data;
   } catch (error) {
-    console.error('Extract grades service error:', error);
+    console.error('Extract grades error:', error);
     return {
       success: false,
-      error: error.message || 'Failed to extract grades'
+      error: error.message || 'Failed to extract grades',
     };
   }
 };
 
-export const clearAllData = async (drive, selectedClass, addLog) => {
+/**
+ * Clear all processing data (delete grade processing folder and ZIP file)
+ */
+export const clearAllData = async (drive, className, onLog) => {
   try {
-    addLog('📡 Sending clear request to backend...');
-    
-    const response = await fetch(`${API_BASE_URL}/quiz/clear-data`, {
+    const API_BASE_URL = await getApiBaseUrl();
+    const response = await fetch(`${API_BASE_URL}/api/quiz/clear-data`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        drive,
-        className: selectedClass
-      })
+      body: JSON.stringify({ drive, className }),
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
+    const data = await response.json();
     
-    // Log any messages from the backend
-    if (result.logs) {
-      result.logs.forEach(message => addLog(message));
+    // If logs are provided, call the onLog callback for each log line
+    if (data.logs && onLog) {
+      data.logs.forEach(log => onLog(log));
     }
     
-    return result;
+    return data;
   } catch (error) {
-    console.error('Clear data service error:', error);
+    console.error('Clear data error:', error);
     return {
       success: false,
-      error: error.message || 'Failed to clear data'
+      error: error.message || 'Failed to clear data',
     };
   }
 };
+

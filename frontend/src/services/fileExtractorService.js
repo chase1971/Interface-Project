@@ -1,69 +1,87 @@
-/**
- * File Extractor Service
- * Handles API calls for file extraction operations
- */
+// File Extractor Service
+// Handles API calls to the backend for file extraction functionality
 
-import { getApiBaseUrl } from '../config';
+const API_BASE_URL = 'http://localhost:5000/api';
 
-/**
- * Process files - extract ZIP, combine PDFs, update Import File
- */
-export const processFiles = async (drive, className, onLog) => {
+export const processFiles = async (drive, selectedClass, addLog) => {
   try {
-    const API_BASE_URL = await getApiBaseUrl();
-    const response = await fetch(`${API_BASE_URL}/api/file-extractor/process`, {
+    addLog('📡 Sending request to backend...');
+    
+    const response = await fetch(`${API_BASE_URL}/file-extractor/process`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ drive, className }),
+      body: JSON.stringify({
+        drive,
+        className: selectedClass
+      })
     });
 
-    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
     
-    // If logs are provided, call the onLog callback for each log line
-    if (data.logs && onLog) {
-      data.logs.forEach(log => onLog(log));
+    // Log any messages from the backend
+    if (result.logs) {
+      result.logs.forEach(message => addLog(message));
     }
     
-    return data;
+    // If there's an error in the result, log it
+    if (!result.success && result.error) {
+      addLog(`❌ Backend Error: ${result.error}`);
+    }
+    
+    return result;
   } catch (error) {
-    console.error('Process files error:', error);
+    console.error('File extractor service error:', error);
+    addLog(`❌ Network Error: ${error.message}`);
     return {
       success: false,
-      error: error.message || 'Failed to process files',
+      error: error.message || 'Failed to process files'
     };
   }
 };
 
-/**
- * Clear all processing data (delete grade processing folder and ZIP file)
- */
-export const clearAllData = async (drive, className, onLog) => {
+export const clearAllData = async (drive, selectedClass, addLog) => {
   try {
-    const API_BASE_URL = await getApiBaseUrl();
-    const response = await fetch(`${API_BASE_URL}/api/file-extractor/clear-data`, {
+    addLog('📡 Sending clear request to backend...');
+    
+    const response = await fetch(`${API_BASE_URL}/file-extractor/clear-data`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ drive, className }),
+      body: JSON.stringify({
+        drive,
+        className: selectedClass
+      })
     });
 
-    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
     
-    // If logs are provided, call the onLog callback for each log line
-    if (data.logs && onLog) {
-      data.logs.forEach(log => onLog(log));
+    // Log any messages from the backend
+    if (result.logs) {
+      result.logs.forEach(message => addLog(message));
     }
     
-    return data;
+    // If there's an error in the result, log it
+    if (!result.success && result.error) {
+      addLog(`❌ Backend Error: ${result.error}`);
+    }
+    
+    return result;
   } catch (error) {
-    console.error('Clear data error:', error);
+    console.error('Clear data service error:', error);
     return {
       success: false,
-      error: error.message || 'Failed to clear data',
+      error: error.message || 'Failed to clear data'
     };
   }
 };
-
