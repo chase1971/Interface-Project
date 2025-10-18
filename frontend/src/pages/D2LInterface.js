@@ -59,12 +59,6 @@ function D2LInterface() {
       return;
     }
 
-    const classUrl = classUrls[className];
-    if (!classUrl) {
-      alert(`No URL found for class: ${className}`);
-      return;
-    }
-
     setSelectedClass(className);
     setStatus(`Navigating to ${className}...`);
     setStatusColor("blue");
@@ -75,15 +69,13 @@ function D2LInterface() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          classUrl: classUrl
-        })
+        body: JSON.stringify({ classCode: className }) // ✅ send classCode, not classUrl
       });
 
       const result = await response.json();
       
       if (result.success) {
-        setStatus(`Opened ${className} - Upload CSV to continue`);
+        setStatus(`Opened ${className} in persistent browser`);
         setStatusColor("green");
       } else {
         setStatus("Class selection failed: " + result.error);
