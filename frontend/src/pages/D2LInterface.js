@@ -126,7 +126,13 @@ function D2LInterface() {
   // ============================================
   // PROCESS SCHEDULE
   // ============================================
-  const handleProcessSchedule = async () => {
+  const handleProcessSchedule = async (e) => {
+    // stop any parent/sibling click handlers from firing
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
     try {
       if (!selectedClass) {
         setStatus("❌ Please select a class first!");
@@ -219,8 +225,9 @@ function D2LInterface() {
               {Object.keys(classUrls).map((className) => (
                 <button
                   key={className}
+                  type="button"
                   className={`class-btn ${selectedClass === className ? "selected" : ""}`}
-                  onClick={() => handleClassSelect(className)}
+                  onClick={(e) => { e.stopPropagation(); handleClassSelect(className); }}
                 >
                   {className}
                 </button>
@@ -232,9 +239,20 @@ function D2LInterface() {
           <div className="d2l-section">
             <h3 className="section-title">Schedule Processing</h3>
             <div className="csv-upload">
-              <button className="file-label" onClick={handleOpenCSV}>📂 Open CSV File</button>
-              <button className="update-btn" onClick={handleProcessSchedule}>⚙️ Process Schedule</button>
-              <button className="exit-btn" onClick={() => navigate('/')}>Back to Home</button>
+              <button type="button" className="file-label" onClick={(e) => { e.stopPropagation(); handleOpenCSV(); }}>
+                📂 Open CSV File
+              </button>
+              <button
+                type="button"
+                className="update-btn"
+                onClick={(e) => handleProcessSchedule(e)}
+                disabled={!loggedIn || !selectedClass}
+              >
+                ⚙️ Process Schedule
+              </button>
+              <button type="button" className="exit-btn" onClick={(e) => { e.stopPropagation(); navigate('/'); }}>
+                Back to Home
+              </button>
             </div>
           </div>
 
