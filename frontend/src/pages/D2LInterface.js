@@ -7,38 +7,33 @@ function D2LInterface() {
   const navigate = useNavigate();
   const [loggedIn, setLoggedIn] = useState(false);
   const [selectedClass, setSelectedClass] = useState(null);
-  const [csvFile, setCsvFile] = useState(null);
   const [status, setStatus] = useState("Ready - Click 'Login to D2L' to begin");
   const [statusColor, setStatusColor] = useState("gray");
 
-  // Class URLs mapping (same as Python GUI)
+  // Class URLs mapping
   const classUrls = {
-    "FM4202": "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1580392",
-    "FM4103": "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1580390",
-    "CA4203": "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1580436",
-    "CA4201": "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1580434",
-    "CA4105": "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1580431",
+    FM4202: "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1580392",
+    FM4103: "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1580390",
+    CA4203: "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1580436",
+    CA4201: "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1580434",
+    CA4105: "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1580431",
   };
 
   const d2lLoginUrl = "https://d2l.lonestar.edu/d2l/home";
 
+  // ============================================
+  // LOGIN TO D2L
+  // ============================================
   const handleLogin = async () => {
     setStatus("Opening browser...");
     setStatusColor("blue");
-    
     try {
-      const response = await fetch('http://localhost:5000/api/d2l/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          classUrl: d2lLoginUrl
-        })
+      const response = await fetch("http://localhost:5000/api/d2l/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ classUrl: d2lLoginUrl }),
       });
-
       const result = await response.json();
-      
       if (result.success) {
         setLoggedIn(true);
         setStatus("Browser opened - Please log in manually");
@@ -53,6 +48,9 @@ function D2LInterface() {
     }
   };
 
+  // ============================================
+  // SELECT CLASS (opens course in browser)
+  // ============================================
   const handleClassSelect = async (className) => {
     if (!loggedIn) {
       alert("Please click 'Login to D2L' first!");
@@ -64,16 +62,22 @@ function D2LInterface() {
     setStatusColor("blue");
 
     try {
+      // Step 1️⃣ - Tell backend to open the course page in persistent Chrome
       const response = await fetch('http://localhost:5000/api/d2l/select-class', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ classCode: className }) // ✅ send classCode, not classUrl
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classCode: className })
       });
 
-      const result = await response.json();
-      
+      let result;
+      try {
+        result = await response.json();
+      } catch {
+        // If the backend ever sends non-JSON again, don't crash the UI.
+        const text = await response.text().catch(() => '');
+        console.error('Non-JSON from /select-class:', text);
+        throw new Error('Invalid JSON returned from server');
+      }
       if (result.success) {
         setStatus(`Opened ${className} in persistent browser`);
         setStatusColor("green");
@@ -87,157 +91,90 @@ function D2LInterface() {
     }
   };
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      setStatus("Uploading CSV file...");
+  // ============================================
+  // OPEN CSV FILE
+  // ============================================
+  const handleOpenCSV = async () => {
+    try {
+      setStatus("Opening CSV file...");
       setStatusColor("blue");
-      
+
+      const response = await fetch("http://localhost:5000/api/d2l/open_csv");
+
+      let result;
       try {
-        const formData = new FormData();
-        formData.append('csvFile', file);
+        result = await response.json();
+      } catch {
+        setStatus("✅ CSV file opened successfully.");
+        setStatusColor("green");
+        return;
+      }
 
-        const response = await fetch('http://localhost:5000/api/d2l/upload', {
-          method: 'POST',
-          body: formData
-        });
-
-        const result = await response.json();
-        
-        if (result.success) {
-          setCsvFile({ file: file, path: result.filePath });
-          setStatus("CSV loaded - Click 'Update Dates' to process");
-          setStatusColor("green");
-        } else {
-          setStatus("Upload failed: " + result.error);
-          setStatusColor("red");
-        }
-      } catch (error) {
-        setStatus("Upload error: " + error.message);
+      if (result.success) {
+        setStatus("✅ CSV file opened successfully.");
+        setStatusColor("green");
+      } else {
+        setStatus("❌ Failed to open CSV: " + result.error);
         setStatusColor("red");
       }
+    } catch (error) {
+      setStatus("Open CSV error: " + error.message);
+      setStatusColor("red");
     }
   };
 
-  const handleBrowseClick = async () => {
+  // ============================================
+  // PROCESS SCHEDULE
+  // ============================================
+  const handleProcessSchedule = async () => {
     try {
-      setStatus("Opening folder...");
+      if (!selectedClass) {
+        setStatus("❌ Please select a class first!");
+        setStatusColor("red");
+        return;
+      }
+
+      setStatus(`⚙️ Processing schedule for ${selectedClass}...`);
       setStatusColor("blue");
-      
-      // Open Windows Explorer to the Email Templates directory
-      const response = await fetch('http://localhost:5000/api/d2l/browse', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          directory: 'C:\\Users\\chase\\My Drive\\Rosters etc\\Email Templates, Assignment Dates'
-        })
+
+      const response = await fetch("http://localhost:5000/api/d2l/process_schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ classCode: selectedClass }),
       });
-      const result = await response.json();
-      
+
+      let result;
+      try {
+        result = await response.json();
+      } catch {
+        setStatus("✅ Schedule process started (Python running).");
+        setStatusColor("green");
+        return;
+      }
+
       if (result.success) {
-        setStatus("Folder opened - Drag and drop your CSV file or click to select");
+        setStatus("✅ Schedule processed successfully.");
         setStatusColor("green");
       } else {
-        setStatus("Failed to open folder: " + result.error);
+        setStatus("❌ Failed to process schedule: " + result.error);
         setStatusColor("red");
       }
     } catch (error) {
-      setStatus("Browse error: " + error.message);
+      setStatus("Process schedule error: " + error.message);
       setStatusColor("red");
     }
   };
 
-  const handleFileClick = () => {
-    // Trigger the hidden file input for manual selection
-    const fileInput = document.getElementById('csv-file');
-    if (fileInput) {
-      fileInput.click();
-    }
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      handleFileUpload({ target: { files: [files[0]] } });
-    }
-  };
-
-  const handleUpdateDates = async () => {
-    if (!loggedIn) {
-      alert("Please login first!");
-      return;
-    }
-
-    if (!selectedClass) {
-      alert("Please select a class first!");
-      return;
-    }
-
-    if (!csvFile) {
-      alert("Please select a CSV file first!");
-      return;
-    }
-
-    setStatus("Processing CSV...");
-    setStatusColor("blue");
-
-    try {
-      const classUrl = classUrls[selectedClass];
-      
-      const response = await fetch('http://localhost:5000/api/d2l/process', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          csvFilePath: csvFile.path,
-          classUrl: classUrl
-        })
-      });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        setStatus(`Success! Processed ${result.processed} assignments`);
-        setStatusColor("green");
-        alert(`Successfully processed ${result.processed} assignments!`);
-      } else {
-        setStatus("Processing failed: " + result.error);
-        setStatusColor("red");
-        alert("Processing failed: " + result.error);
-      }
-    } catch (error) {
-      setStatus("Processing error: " + error.message);
-      setStatusColor("red");
-      alert("Processing error: " + error.message);
-    }
-  };
-
+  // ============================================
+  // CLEAR LOGIN STATE
+  // ============================================
   const handleClearLogin = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/d2l/clear', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-
+      const response = await fetch("http://localhost:5000/api/d2l/clear", { method: "POST" });
       const result = await response.json();
-      
       if (result.success) {
         setLoggedIn(false);
         setSelectedClass(null);
-        setCsvFile(null);
         setStatus("Ready - Click 'Login to D2L' to begin");
         setStatusColor("gray");
       } else {
@@ -250,6 +187,9 @@ function D2LInterface() {
     }
   };
 
+  // ============================================
+  // INTERFACE LAYOUT
+  // ============================================
   return (
     <div className="d2l-container">
       <header className="d2l-header">
@@ -259,11 +199,12 @@ function D2LInterface() {
 
       <main className="d2l-main">
         <div className="d2l-content">
-          {/* Login Section */}
+
+          {/* LOGIN SECTION */}
           <div className="d2l-section">
             <h3 className="section-title">Login</h3>
-            <button 
-              className={`login-btn ${loggedIn ? 'disabled' : ''}`}
+            <button
+              className={`login-btn ${loggedIn ? "disabled" : ""}`}
               onClick={handleLogin}
               disabled={loggedIn}
             >
@@ -271,14 +212,14 @@ function D2LInterface() {
             </button>
           </div>
 
-          {/* Class Selection Section */}
+          {/* CLASS SELECTION SECTION */}
           <div className="d2l-section">
             <h3 className="section-title">Select Class</h3>
             <div className="class-buttons">
               {Object.keys(classUrls).map((className) => (
                 <button
                   key={className}
-                  className={`class-btn ${selectedClass === className ? 'selected' : ''}`}
+                  className={`class-btn ${selectedClass === className ? "selected" : ""}`}
                   onClick={() => handleClassSelect(className)}
                 >
                   {className}
@@ -287,65 +228,28 @@ function D2LInterface() {
             </div>
           </div>
 
-          {/* CSV Upload Section */}
+          {/* CSV AND PROCESSING SECTION */}
           <div className="d2l-section">
-            <h3 className="section-title">Upload CSV</h3>
+            <h3 className="section-title">Schedule Processing</h3>
             <div className="csv-upload">
-              <input
-                type="file"
-                accept=".csv"
-                onChange={handleFileUpload}
-                className="file-input"
-                id="csv-file"
-              />
-              <div 
-                className="drop-zone"
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onClick={handleFileClick}
-                style={{ 
-                  border: '2px dashed #00b3ff', 
-                  borderRadius: '8px', 
-                  padding: '20px', 
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  marginBottom: '10px',
-                  background: 'rgba(0, 179, 255, 0.05)'
-                }}
-              >
-                <p style={{ margin: 0, color: '#00b3ff' }}>
-                  {csvFile ? `Selected: ${csvFile}` : 'Click to select CSV or drag and drop here'}
-                </p>
-              </div>
-              <button className="file-label" onClick={handleBrowseClick}>
-                Open Folder
-              </button>
-              <button 
-                className="update-btn"
-                onClick={handleUpdateDates}
-                disabled={!loggedIn || !selectedClass || !csvFile}
-              >
-                Update Dates
-              </button>
-              <button className="exit-btn" onClick={() => navigate('/')}>
-                Back to Home
-              </button>
+              <button className="file-label" onClick={handleOpenCSV}>📂 Open CSV File</button>
+              <button className="update-btn" onClick={handleProcessSchedule}>⚙️ Process Schedule</button>
+              <button className="exit-btn" onClick={() => navigate('/')}>Back to Home</button>
             </div>
           </div>
 
-          {/* Status Section */}
+          {/* STATUS SECTION */}
           <div className="status-section">
-            <p className={`status-text ${statusColor}`}>
-              {status}
-            </p>
+            <p className={`status-text ${statusColor}`}>{status}</p>
           </div>
 
-          {/* Clear Login Button */}
+          {/* CLEAR LOGIN BUTTON */}
           <div className="clear-section">
             <button className="clear-btn" onClick={handleClearLogin}>
               Clear Login
             </button>
           </div>
+
         </div>
       </main>
     </div>

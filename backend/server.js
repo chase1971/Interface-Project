@@ -11,7 +11,7 @@ const fileExtractorRoutes = require('./routes/fileExtractorRoutes');
 const app = express();
 const PORT = process.env.PORT || process.env.BACKEND_PORT || 5000;
 
-// Middleware
+// ✅ Enable CORS and JSON parsing
 app.use(cors());
 app.use(express.json());
 
@@ -36,8 +36,8 @@ app.use((error, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, 'localhost', () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`D2L Backend API running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/api/health`);
-  console.log(`🔒 Server bound to localhost only - not accessible from network`);
+  console.log(`🌐 Server accessible on all interfaces`);
 });
