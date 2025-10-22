@@ -218,7 +218,7 @@
 }
 
 /* Buttons */
-.btn-primary, .btn-secondary, .btn-success, .btn-danger {
+.btn-primary, .btn-secondary, .btn-success, .btn-warning, .btn-danger {
   font-family: "Orbitron", sans-serif;
   padding: 10px 20px;
   border: 1px solid var(--accent-blue);
@@ -260,6 +260,21 @@
   transform: translateY(-2px);
 }
 
+.btn-warning {
+  background: linear-gradient(145deg, #1a1a0d, #1f1f11);
+  color: #ffaa00;
+  border-color: #ffaa00;
+  box-shadow: 0 0 12px rgba(255, 170, 0, 0.25);
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: #ffaa00;
+  border-color: #ffcc33;
+  color: #000;
+  box-shadow: 0 0 25px rgba(255, 170, 0, 0.7);
+  transform: translateY(-2px);
+}
+
 .btn-danger {
   background: linear-gradient(145deg, #1a0d0d, #1f1111);
   color: #ff4444;
@@ -295,6 +310,15 @@
   width: 100%;
   padding: 12px 24px;
   font-size: 1rem;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+}
+
+.button-group .btn-large {
+  flex: 1;
 }
 
 button:disabled {

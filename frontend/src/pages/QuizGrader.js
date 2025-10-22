@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './QuizGrader.css';
-import { listClasses, processQuizzes, extractGrades, clearAllData } from '../services/quizGraderService';
+import { listClasses, processQuizzes, extractGrades, splitPdf, openFolder, clearAllData } from '../services/quizGraderService';
 
 function QuizGrader() {
   const navigate = useNavigate();
@@ -9,6 +9,7 @@ function QuizGrader() {
   const [selectedClass, setSelectedClass] = useState('');
   const [processing, setProcessing] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [splitting, setSplitting] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [logs, setLogs] = useState([]);
   const logContainerRef = useRef(null);
@@ -96,6 +97,58 @@ function QuizGrader() {
     }
   };
 
+  // Split combined PDF back into individual student PDFs and rezip
+  const handleSplitPdf = async () => {
+    if (!selectedClass) {
+      addLog('❌ Please select a class first');
+      return;
+    }
+
+    setSplitting(true);
+    addLog('📄 Splitting combined PDF back into individual student PDFs...');
+    addLog('📦 Rezipping folders back to original ZIP file...');
+    
+    try {
+      const result = await splitPdf(drive, selectedClass, addLog);
+      
+      if (result.success) {
+        addLog('✅ PDF splitting and rezipping completed!');
+        addLog('📁 Individual PDFs restored to student folders');
+        if (result.zip_created) {
+          addLog('📦 ZIP file created in grade processing folder');
+        }
+      } else {
+        addLog(`❌ Error: ${result.error}`);
+      }
+    } catch (error) {
+      addLog(`❌ Error: ${error.message}`);
+    } finally {
+      setSplitting(false);
+    }
+  };
+
+  // Open grade processing folder
+  const handleOpenFolder = async () => {
+    if (!selectedClass) {
+      addLog('❌ Please select a class first');
+      return;
+    }
+
+    addLog('📂 Opening grade processing folder...');
+    
+    try {
+      const result = await openFolder(drive, selectedClass, addLog);
+      
+      if (result.success) {
+        addLog('✅ Grade processing folder opened!');
+      } else {
+        addLog(`❌ Error: ${result.error}`);
+      }
+    } catch (error) {
+      addLog(`❌ Error: ${error.message}`);
+    }
+  };
+
   // Clear all processing data
   const handleClearAllData = async () => {
     if (!selectedClass) {
@@ -130,6 +183,7 @@ function QuizGrader() {
     setSelectedClass('');
     setProcessing(false);
     setExtracting(false);
+    setSplitting(false);
     setClearing(false);
     setLogs([]);
   };
@@ -241,6 +295,33 @@ function QuizGrader() {
               >
                 {extracting ? 'Extracting...' : 'Extract Grades'}
               </button>
+            </div>
+
+            {/* Step 4: Split PDF and Rezip */}
+            <div className="workflow-section action-section">
+              <div className="section-header">
+                <span className="step-number">4</span>
+                <h2>Split PDF and Rezip</h2>
+              </div>
+              <p className="section-description">
+                Split combined PDF back into individual student PDFs and rezip folders.
+              </p>
+              <div className="button-group">
+                <button 
+                  className="btn-warning btn-large"
+                  onClick={handleSplitPdf}
+                  disabled={!selectedClass || splitting}
+                >
+                  {splitting ? 'Processing...' : 'Split PDF and Rezip'}
+                </button>
+                <button 
+                  className="btn-secondary btn-large"
+                  onClick={handleOpenFolder}
+                  disabled={!selectedClass}
+                >
+                  📂 Open Folder
+                </button>
+              </div>
             </div>
 
             {/* Clear All Data */}

@@ -216,6 +216,161 @@ router.post('/extract-grades', (req, res) => {
   }
 });
 
+// Split combined PDF back into individual student PDFs
+router.post('/split-pdf', (req, res) => {
+  try {
+    const { drive, className } = req.body;
+
+    if (!drive || !className) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Drive and class name are required' 
+      });
+    }
+
+    // Path to the split PDF CLI script - using absolute path
+    const scriptPath = path.resolve(__dirname, '..', '..', '..', 'Quiz-extraction', 'split_pdf_cli.py');
+    
+    if (!fs.existsSync(scriptPath)) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Split PDF script not found' 
+      });
+    }
+
+    // Execute Python script
+    const pythonProcess = spawn('python', [
+      scriptPath,
+      drive,
+      className
+    ], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+    });
+
+    let output = '';
+    let errorOutput = '';
+    const logs = [];
+
+    pythonProcess.stdout.on('data', (data) => {
+      const text = data.toString();
+      output += text;
+      
+      // Parse logs line by line
+      text.split('\n').forEach(line => {
+        if (line.trim()) {
+          logs.push(line.trim());
+        }
+      });
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+      if (code === 0) {
+        res.json({ 
+          success: true, 
+          message: 'PDF splitting completed',
+          logs: logs,
+          output: output
+        });
+      } else {
+        res.json({ 
+          success: false, 
+          error: 'PDF splitting failed',
+          logs: logs,
+          output: output,
+          errorOutput: errorOutput
+        });
+      }
+    });
+
+  } catch (error) {
+    console.error('Split PDF error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Open grade processing folder
+router.post('/open-folder', (req, res) => {
+  try {
+    const { drive, className } = req.body;
+
+    if (!drive || !className) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Drive and class name are required' 
+      });
+    }
+
+    // Build the grade processing folder path
+    let processingFolderPath;
+    if (drive === 'G') {
+      // Try different possible paths for G drive
+      const possiblePaths = [
+        `${drive}:\\Users\\chase\\My Drive\\Rosters etc\\${className}\\grade processing`,
+        `${drive}:\\chase\\My Drive\\Rosters etc\\${className}\\grade processing`,
+        `${drive}:\\My Drive\\Rosters etc\\${className}\\grade processing`
+      ];
+      
+      processingFolderPath = possiblePaths.find(path => fs.existsSync(path));
+      if (!processingFolderPath) {
+        processingFolderPath = possiblePaths[0]; // Use first path as fallback
+      }
+    } else {
+      processingFolderPath = `${drive}:\\Users\\chase\\My Drive\\Rosters etc\\${className}\\grade processing`;
+    }
+
+    if (!fs.existsSync(processingFolderPath)) {
+      return res.status(404).json({ 
+        success: false, 
+        error: `Grade processing folder not found at ${processingFolderPath}` 
+      });
+    }
+
+    // Open the folder using the system's default file manager
+    const { spawn } = require('child_process');
+    const platform = process.platform;
+    
+    let command, args;
+    if (platform === 'win32') {
+      command = 'explorer';
+      args = [processingFolderPath];
+    } else if (platform === 'darwin') {
+      command = 'open';
+      args = [processingFolderPath];
+    } else {
+      command = 'xdg-open';
+      args = [processingFolderPath];
+    }
+
+    const openProcess = spawn(command, args, { 
+      stdio: 'ignore',
+      detached: true 
+    });
+    
+    openProcess.unref(); // Allow the process to exit independently
+
+    res.json({ 
+      success: true, 
+      message: 'Grade processing folder opened',
+      path: processingFolderPath
+    });
+
+  } catch (error) {
+    console.error('Open folder error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
 // Clear all processing data (delete grade processing folder and ZIP file)
 router.post('/clear-data', (req, res) => {
   try {

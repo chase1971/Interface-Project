@@ -79,7 +79,7 @@ router.post('/process', (req, res) => {
     }
 
     // Path to the file extraction CLI script
-    const scriptPath = path.resolve(__dirname, '..', '..', '..', 'File-extraction', 'file_extraction_cli (1).py');
+    const scriptPath = path.resolve(__dirname, '..', '..', '..', 'File-extraction', 'file_extraction_cli.py');
     
     if (!fs.existsSync(scriptPath)) {
       return res.status(404).json({ 
@@ -159,7 +159,7 @@ router.post('/clear-data', (req, res) => {
     }
 
     // Path to the cleanup CLI script
-    const scriptPath = path.resolve(__dirname, '..', '..', '..', 'File-extraction', 'cleanup_data_cli (1).py');
+    const scriptPath = path.resolve(__dirname, '..', '..', '..', 'File-extraction', 'cleanup_data_cli.py');
     
     if (!fs.existsSync(scriptPath)) {
       return res.status(404).json({ 

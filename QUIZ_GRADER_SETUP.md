@@ -9,6 +9,7 @@
 1. `POST /api/quiz/list-classes` - Lists available classes from Rosters etc folder
 2. `POST /api/quiz/process` - Processes Canvas ZIP, combines PDFs, prepares for grading
 3. `POST /api/quiz/extract-grades` - Extracts grades from graded PDF using OCR
+4. `POST /api/quiz/split-pdf` - Splits combined PDF back into individual student PDFs
 
 ### Frontend (React)
 **Location:** `Interface-Project/frontend/src/pages/QuizGrader.js`
@@ -18,6 +19,7 @@
 - Class dropdown with day/time schedules
 - "Process Quizzes" button (auto-finds Canvas ZIP in Downloads)
 - "Extract Grades" button (runs OCR on graded PDF)
+- "Split PDF" button (splits combined PDF back to individual PDFs)
 - Activity log for real-time feedback
 - "Back to Home" and "Clear All" utility buttons
 
@@ -40,7 +42,12 @@
    - Runs OCR and updates Import File.csv
    - Flags low-confidence grades with "VERIFY" in Column G
 
-3. **`grading_processor.py`** (EXISTING)
+3. **`split_pdf_cli.py`** (NEW)
+   - CLI wrapper for splitting combined PDF back into individual student PDFs
+   - Accepts: `<drive_letter> <class_name>`
+   - Uses existing `run_reverse_process` function from grading_processor.py
+
+4. **`grading_processor.py`** (EXISTING)
    - Main processing logic
    - Called by process_quiz_cli.py
 
@@ -136,6 +143,17 @@ python extract_grades_cli.py C "CA 4201"
    - Updates Import File.csv with grades
    - Flags low-confidence grades with "VERIFY" in Column G
    - Opens `1combinedpdf_GRADES_ONLY.pdf` for review
+
+### Step 3: Split PDF (NEW)
+1. After grading is complete, click "Split PDF"
+2. Backend calls `split_pdf_cli.py <drive> <class>`
+3. Python script:
+   - Locates `1combinedpdf.pdf`
+   - Extracts student names from PDF watermarks
+   - Matches names to original student folders
+   - Splits PDF into individual student pages
+   - Replaces original PDFs in student folders
+   - Restores individual graded PDFs to their original locations
 
 ---
 

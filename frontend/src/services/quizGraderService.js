@@ -100,6 +100,78 @@ export const extractGrades = async (drive, selectedClass, addLog) => {
   }
 };
 
+export const splitPdf = async (drive, selectedClass, addLog) => {
+  try {
+    addLog('📡 Sending split PDF request to backend...');
+    
+    const response = await fetch(`${API_BASE_URL}/quiz/split-pdf`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        drive,
+        className: selectedClass
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    // Log any messages from the backend
+    if (result.logs) {
+      result.logs.forEach(message => addLog(message));
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Split PDF service error:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to split PDF'
+    };
+  }
+};
+
+export const openFolder = async (drive, selectedClass, addLog) => {
+  try {
+    addLog('📡 Sending open folder request to backend...');
+    
+    const response = await fetch(`${API_BASE_URL}/quiz/open-folder`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        drive,
+        className: selectedClass
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    // Log any messages from the backend
+    if (result.logs) {
+      result.logs.forEach(message => addLog(message));
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Open folder service error:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to open folder'
+    };
+  }
+};
+
 export const clearAllData = async (drive, selectedClass, addLog) => {
   try {
     addLog('📡 Sending clear request to backend...');
