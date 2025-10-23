@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const { exec } = require('child_process');
 
 const router = express.Router();
 
@@ -9,7 +10,7 @@ const router = express.Router();
 router.post('/list-classes', (req, res) => {
   try {
     const { drive } = req.body;
-    const rostersPath = path.join(`${drive}:\\`, 'Users', 'chase', 'My Drive', 'Rosters etc');
+    const rostersPath = path.join(`${drive}:`, 'Users', 'chase', 'My Drive', 'Rosters etc');
     
     if (!fs.existsSync(rostersPath)) {
       return res.status(404).json({ 
@@ -44,6 +45,87 @@ router.post('/list-classes', (req, res) => {
 
   } catch (error) {
     console.error('List classes error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Process quizzes with specific ZIP file selection
+router.post('/process-selected', (req, res) => {
+  try {
+    const { drive, className, zipPath } = req.body;
+
+    if (!drive || !className || !zipPath) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Drive, class name, and ZIP path are required' 
+      });
+    }
+
+    // Path to the process quiz CLI script - using absolute path
+    const scriptPath = path.resolve(__dirname, '..', '..', '..', 'Quiz-extraction', 'process_quiz_cli.py');
+    
+    if (!fs.existsSync(scriptPath)) {
+      return res.status(404).json({ 
+        success: false, 
+        error: `Grading processor script not found at ${scriptPath}` 
+      });
+    }
+
+    // Execute Python script with the selected ZIP file
+    const pythonProcess = spawn('python', [
+      scriptPath,
+      drive,
+      className,
+      zipPath
+    ], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+    });
+
+    let output = '';
+    let errorOutput = '';
+    const logs = [];
+
+    pythonProcess.stdout.on('data', (data) => {
+      const text = data.toString();
+      output += text;
+      
+      // Parse logs line by line
+      text.split('\n').forEach(line => {
+        if (line.trim()) {
+          logs.push(line.trim());
+        }
+      });
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+      if (code === 0) {
+        res.json({ 
+          success: true, 
+          message: 'Quiz processing completed',
+          logs: logs,
+          output: output
+        });
+      } else {
+        res.json({ 
+          success: false, 
+          error: 'Process failed',
+          logs: logs,
+          output: output,
+          errorOutput: errorOutput
+        });
+      }
+    });
+
+  } catch (error) {
+    console.error('Process selected quiz error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -91,17 +173,27 @@ router.post('/process', (req, res) => {
     let output = '';
     let errorOutput = '';
     const logs = [];
+    let responseSent = false;
 
     pythonProcess.stdout.on('data', (data) => {
       const text = data.toString();
       output += text;
       
-      // Parse logs line by line
-      text.split('\n').forEach(line => {
-        if (line.trim()) {
-          logs.push(line.trim());
+      // Try to parse JSON from stdout (for multiple ZIP files case)
+      try {
+        const jsonData = JSON.parse(text.trim());
+        if (jsonData.error === 'Multiple ZIP files found' && !responseSent) {
+          responseSent = true;
+          return res.json(jsonData);
         }
-      });
+      } catch (e) {
+        // Not JSON, parse as regular logs
+        text.split('\n').forEach(line => {
+          if (line.trim()) {
+            logs.push(line.trim());
+          }
+        });
+      }
     });
 
     pythonProcess.stderr.on('data', (data) => {
@@ -109,6 +201,10 @@ router.post('/process', (req, res) => {
     });
 
     pythonProcess.on('close', (code) => {
+      if (responseSent) {
+        return; // Response already sent, don't send another one
+      }
+      
       if (code === 0) {
         res.json({ 
           success: true, 
@@ -308,6 +404,46 @@ router.post('/open-folder', (req, res) => {
       });
     }
 
+    // Special case: open Downloads folder
+    if (className === 'DOWNLOADS') {
+      const downloadsPath = path.join(process.env.USERPROFILE || 'C:\\Users\\chase', 'Downloads');
+      
+      if (!fs.existsSync(downloadsPath)) {
+        return res.status(404).json({ 
+          success: false, 
+          error: `Downloads folder not found at ${downloadsPath}` 
+        });
+      }
+
+      // Open Downloads folder using the system's default file manager
+      const platform = process.platform;
+      
+      let command, args;
+      if (platform === 'win32') {
+        command = 'explorer';
+        args = [downloadsPath];
+      } else if (platform === 'darwin') {
+        command = 'open';
+        args = [downloadsPath];
+      } else {
+        command = 'xdg-open';
+        args = [downloadsPath];
+      }
+
+      const openProcess = spawn(command, args, { 
+        stdio: 'ignore',
+        detached: true 
+      });
+      
+      openProcess.unref(); // Allow the process to exit independently
+
+      return res.json({ 
+        success: true, 
+        message: 'Downloads folder opened',
+        path: downloadsPath
+      });
+    }
+
     // Build the grade processing folder path
     let processingFolderPath;
     if (drive === 'G') {
@@ -318,7 +454,7 @@ router.post('/open-folder', (req, res) => {
         `${drive}:\\My Drive\\Rosters etc\\${className}\\grade processing`
       ];
       
-      processingFolderPath = possiblePaths.find(path => fs.existsSync(path));
+      processingFolderPath = possiblePaths.find(folderPath => fs.existsSync(folderPath));
       if (!processingFolderPath) {
         processingFolderPath = possiblePaths[0]; // Use first path as fallback
       }
@@ -327,14 +463,48 @@ router.post('/open-folder', (req, res) => {
     }
 
     if (!fs.existsSync(processingFolderPath)) {
-      return res.status(404).json({ 
-        success: false, 
-        error: `Grade processing folder not found at ${processingFolderPath}` 
-      });
+      // If grade processing folder doesn't exist, open the parent class folder instead
+      const parentClassPath = processingFolderPath.replace('\\grade processing', '');
+      
+      if (fs.existsSync(parentClassPath)) {
+        // Open the parent class folder
+        const platform = process.platform;
+        let command, args;
+        if (platform === 'win32') {
+          command = 'explorer';
+          args = [parentClassPath];
+        } else if (platform === 'darwin') {
+          command = 'open';
+          args = [parentClassPath];
+        } else {
+          command = 'xdg-open';
+          args = [parentClassPath];
+        }
+
+        const openProcess = spawn(command, args, { 
+          stdio: 'ignore',
+          detached: true 
+        });
+        
+        openProcess.unref(); // Allow the process to exit independently
+
+        return res.json({ 
+          success: true, 
+          message: 'Class folder opened (no grade processing folder found)',
+          logs: [`📂 Looking for grade processing folder at: ${processingFolderPath}`, `ℹ️ No grade processing folder found for ${className}`, `📁 Opening parent class folder instead: ${parentClassPath}`],
+          path: parentClassPath
+        });
+      } else {
+        return res.json({ 
+          success: true, 
+          message: 'No grade processing folder found',
+          logs: [`📂 Looking for grade processing folder at: ${processingFolderPath}`, `ℹ️ No grade processing folder available for ${className}`, `❌ Parent class folder also not found`],
+          path: processingFolderPath
+        });
+      }
     }
 
     // Open the folder using the system's default file manager
-    const { spawn } = require('child_process');
     const platform = process.platform;
     
     let command, args;
@@ -424,7 +594,11 @@ router.post('/clear-data', (req, res) => {
     });
 
     pythonProcess.on('close', (code) => {
-      if (code === 0) {
+      // Check if the output contains SUCCESS or ERROR markers
+      const hasSuccess = output.includes('SUCCESS:');
+      const hasError = output.includes('ERROR:');
+      
+      if (code === 0 && hasSuccess) {
         res.json({ 
           success: true, 
           message: 'Data cleanup completed',
@@ -447,6 +621,75 @@ router.post('/clear-data', (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: error.message 
+    });
+  }
+});
+
+// Open Downloads folder
+router.post('/open-downloads', (req, res) => {
+  try {
+    const downloadsPath = path.join(process.env.USERPROFILE || 'C:\\Users\\chase', 'Downloads');
+    console.log('Attempting to open Downloads folder at:', downloadsPath);
+    console.log('USERPROFILE:', process.env.USERPROFILE);
+    
+    // Check if the path exists first
+    if (!fs.existsSync(downloadsPath)) {
+      console.log('Downloads folder does not exist at:', downloadsPath);
+      return res.status(404).json({
+        success: false,
+        error: 'Downloads folder not found',
+        path: downloadsPath,
+        userProfile: process.env.USERPROFILE
+      });
+    }
+    
+    // Try multiple methods to open the Downloads folder
+    const commands = [
+      `explorer "${downloadsPath}"`,
+      `start "" "${downloadsPath}"`,
+      `cmd /c start "" "${downloadsPath}"`
+    ];
+    
+    let commandIndex = 0;
+    
+    const tryNextCommand = () => {
+      if (commandIndex >= commands.length) {
+        return res.status(500).json({
+          success: false,
+          error: 'All methods failed to open Downloads folder',
+          path: downloadsPath,
+          attemptedCommands: commands
+        });
+      }
+      
+      const command = commands[commandIndex];
+      console.log(`Trying command ${commandIndex + 1}/${commands.length}:`, command);
+      
+      exec(command, { timeout: 5000 }, (error, stdout, stderr) => {
+        if (error) {
+          console.log(`Command ${commandIndex + 1} failed:`, error.message);
+          commandIndex++;
+          tryNextCommand();
+        } else {
+          console.log('Downloads folder opened successfully with command:', command);
+          res.json({
+            success: true,
+            message: 'Downloads folder opened successfully',
+            path: downloadsPath,
+            method: command
+          });
+        }
+      });
+    };
+    
+    tryNextCommand();
+    
+  } catch (error) {
+    console.error('Error in open-downloads:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      details: error.message
     });
   }
 });

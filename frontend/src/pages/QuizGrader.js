@@ -1,17 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './QuizGrader.css';
-import { listClasses, processQuizzes, extractGrades, splitPdf, openFolder, clearAllData } from '../services/quizGraderService';
+import { listClasses, processQuizzes, processSelectedQuiz, extractGrades, splitPdf, openFolder, openDownloads, clearAllData } from '../services/quizGraderService';
 
 function QuizGrader() {
   const navigate = useNavigate();
-  const [drive, setDrive] = useState('C');
+  // Always use C drive
+  const drive = 'C';
   const [selectedClass, setSelectedClass] = useState('');
   const [processing, setProcessing] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [splitting, setSplitting] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [logs, setLogs] = useState([]);
+  const [zipFiles, setZipFiles] = useState([]);
+  const [showZipSelection, setShowZipSelection] = useState(false);
   const logContainerRef = useRef(null);
 
   // Auto-scroll logs to bottom when new messages arrive
@@ -45,6 +48,23 @@ function QuizGrader() {
     }
   };
 
+  // Open Downloads folder
+  const handleOpenDownloads = async () => {
+    addLog('📁 Opening Downloads folder...');
+    
+    try {
+      const result = await openDownloads(addLog);
+      
+      if (result.success) {
+        addLog('✅ Downloads folder opened successfully!');
+      } else {
+        addLog(`❌ Error: ${result.error}`);
+      }
+    } catch (error) {
+      addLog(`❌ Error: ${error.message}`);
+    }
+  };
+
   // Process quizzes (extract ZIP, combine PDFs, prepare for grading)
   const handleProcessQuizzes = async () => {
     if (!selectedClass) {
@@ -57,6 +77,35 @@ function QuizGrader() {
     
     try {
       const result = await processQuizzes(drive, selectedClass, addLog);
+      
+      if (result.success) {
+        addLog('✅ Quiz processing completed!');
+        addLog('📂 Combined PDF ready for manual grading');
+      } else if (result.error === 'Multiple ZIP files found') {
+        // Show ZIP file selection dialog
+        setZipFiles(result.zip_files || []);
+        setShowZipSelection(true);
+        addLog('📁 Multiple ZIP files found - please select one');
+        // Don't set processing to false here, keep it true until user selects
+        return; // Exit early, don't set processing to false
+      } else {
+        addLog(`❌ Error: ${result.error}`);
+      }
+    } catch (error) {
+      addLog(`❌ Error: ${error.message}`);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Handle ZIP file selection
+  const handleZipSelection = async (zipPath) => {
+    setShowZipSelection(false);
+    setProcessing(true);
+    addLog(`📁 Processing selected ZIP file: ${zipPath.split('\\').pop()}`);
+    
+    try {
+      const result = await processSelectedQuiz(drive, selectedClass, zipPath, addLog);
       
       if (result.success) {
         addLog('✅ Quiz processing completed!');
@@ -140,7 +189,12 @@ function QuizGrader() {
       const result = await openFolder(drive, selectedClass, addLog);
       
       if (result.success) {
-        addLog('✅ Grade processing folder opened!');
+        // Check if it's the parent class folder that was opened
+        if (result.message && result.message.includes('no grade processing folder found')) {
+          addLog('📁 Class folder opened (no grade processing folder found)');
+        } else {
+          addLog('✅ Grade processing folder opened!');
+        }
       } else {
         addLog(`❌ Error: ${result.error}`);
       }
@@ -179,7 +233,6 @@ function QuizGrader() {
   };
 
   const handleClearAll = () => {
-    setDrive('C');
     setSelectedClass('');
     setProcessing(false);
     setExtracting(false);
@@ -209,24 +262,6 @@ function QuizGrader() {
             </div>
             
             <div className="form-group">
-              <label>Drive Selection</label>
-              <div className="drive-selector">
-                <button 
-                  className={`drive-button ${drive === 'C' ? 'active' : ''}`}
-                  onClick={() => setDrive('C')}
-                >
-                  C: Drive
-                </button>
-                <button 
-                  className={`drive-button ${drive === 'G' ? 'active' : ''}`}
-                  onClick={() => setDrive('G')}
-                >
-                  G: Drive (Google)
-                </button>
-              </div>
-            </div>
-
-            <div className="form-group">
               <label>Select Class</label>
               <div className="input-with-button">
                 <select 
@@ -247,6 +282,13 @@ function QuizGrader() {
               </div>
             </div>
 
+            <div className="form-group">
+              <label>Downloads Folder</label>
+              <button className="btn-secondary" onClick={handleOpenDownloads}>
+                📁 Open Downloads Folder
+              </button>
+            </div>
+
             {/* Activity Log */}
             <div className="log-container" ref={logContainerRef}>
               {logs.length === 0 ? (
@@ -257,6 +299,33 @@ function QuizGrader() {
                 ))
               )}
             </div>
+
+            {/* ZIP File Selection Dialog */}
+            {showZipSelection && (
+              <div className="zip-selection-dialog">
+                <div className="zip-selection-content">
+                  <h3>📁 Select ZIP File</h3>
+                  <p>Multiple ZIP files found. Please select which one to process:</p>
+                  <div className="zip-files-list">
+                    {zipFiles.map((zipFile, index) => (
+                      <button
+                        key={index}
+                        className="zip-file-option"
+                        onClick={() => handleZipSelection(zipFile.path)}
+                      >
+                        {zipFile.index}. {zipFile.filename}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    className="btn-secondary"
+                    onClick={() => setShowZipSelection(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* RIGHT SIDE: Actions */}
