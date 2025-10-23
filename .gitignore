@@ -18,6 +18,8 @@ yarn-error.log*
 # Logs
 logs/
 *.log
+# Centralized logs folder
+../Logs/
 
 # Runtime data
 pids/
