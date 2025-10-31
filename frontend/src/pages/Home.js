@@ -21,10 +21,6 @@ function Home() {
     navigate('/quiz-grader');
   };
 
-  const handleFileExtractorClick = () => {
-    navigate('/file-extractor');
-  };
-
   // Check server status on component mount
   useEffect(() => {
     checkServerStatus();
@@ -111,10 +107,6 @@ function Home() {
             <button className="menu-card purple" onClick={handleQuizGraderClick}>
               <div className="card-title">Quiz Grader</div>
               <div className="card-description">OCR-based quiz grading system</div>
-            </button>
-            <button className="menu-card orange" onClick={handleFileExtractorClick}>
-              <div className="card-title">File Extractor</div>
-              <div className="card-description">Process Canvas assignment submissions</div>
             </button>
           </div>
         </section>

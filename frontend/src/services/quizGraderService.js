@@ -101,6 +101,79 @@ export const processSelectedQuiz = async (drive, selectedClass, zipPath, addLog)
   }
 };
 
+export const processCompletion = async (drive, selectedClass, addLog) => {
+  try {
+    addLog('📡 Sending completion processing request to backend...');
+    
+    const response = await fetch(`${API_BASE_URL}/quiz/process-completion`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        drive,
+        className: selectedClass
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    // Log any messages from the backend
+    if (result.logs) {
+      result.logs.forEach(message => addLog(message));
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Process completion service error:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to process completion'
+    };
+  }
+};
+
+export const processSelectedCompletion = async (drive, selectedClass, zipPath, addLog) => {
+  try {
+    addLog('📡 Sending selected completion processing request to backend...');
+    
+    const response = await fetch(`${API_BASE_URL}/quiz/process-completion-selected`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        drive,
+        className: selectedClass,
+        zipPath
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    // Log any messages from the backend
+    if (result.logs) {
+      result.logs.forEach(message => addLog(message));
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Process selected completion service error:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to process selected completion'
+    };
+  }
+};
+
 export const extractGrades = async (drive, selectedClass, addLog) => {
   try {
     addLog('📡 Sending grade extraction request to backend...');

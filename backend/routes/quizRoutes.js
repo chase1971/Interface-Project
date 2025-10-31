@@ -93,10 +93,11 @@ router.post('/process-selected', (req, res) => {
       const text = data.toString();
       output += text;
       
-      // Parse logs line by line
+      // Parse logs line by line, but skip JSON lines
       text.split('\n').forEach(line => {
-        if (line.trim()) {
-          logs.push(line.trim());
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+          logs.push(trimmed);
         }
       });
     });
@@ -114,9 +115,28 @@ router.post('/process-selected', (req, res) => {
           output: output
         });
       } else {
+        // Try to parse error from stderr (JSON response)
+        let errorMessage = 'Process failed';
+        try {
+          const jsonError = JSON.parse(errorOutput.trim());
+          if (jsonError.error) {
+            errorMessage = jsonError.error;
+          }
+        } catch (e) {
+          // If stderr isn't JSON, check if output contains JSON
+          try {
+            const jsonOutput = JSON.parse(output.trim());
+            if (jsonOutput.error) {
+              errorMessage = jsonOutput.error;
+            }
+          } catch (e2) {
+            // Use default error message
+          }
+        }
+        
         res.json({ 
           success: false, 
-          error: 'Process failed',
+          error: errorMessage,
           logs: logs,
           output: output,
           errorOutput: errorOutput
@@ -213,6 +233,220 @@ router.post('/process', (req, res) => {
           output: output
         });
       } else {
+        // Try to parse error from stderr (JSON response)
+        let errorMessage = 'Process failed';
+        try {
+          const jsonError = JSON.parse(errorOutput.trim());
+          if (jsonError.error) {
+            errorMessage = jsonError.error;
+          }
+        } catch (e) {
+          // If stderr isn't JSON, check if output contains JSON
+          try {
+            const jsonOutput = JSON.parse(output.trim());
+            if (jsonOutput.error) {
+              errorMessage = jsonOutput.error;
+            }
+          } catch (e2) {
+            // Use default error message
+          }
+        }
+        
+        res.json({ 
+          success: false, 
+          error: errorMessage,
+          logs: logs,
+          output: output,
+          errorOutput: errorOutput
+        });
+      }
+    });
+
+  } catch (error) {
+    console.error('Process quizzes error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Process completions with specific ZIP file selection
+router.post('/process-completion-selected', (req, res) => {
+  try {
+    const { drive, className, zipPath } = req.body;
+
+    if (!drive || !className || !zipPath) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Drive, class name, and ZIP path are required' 
+      });
+    }
+
+    // Path to the process completion CLI script
+    const scriptPath = path.resolve(__dirname, '..', '..', '..', 'Quiz-extraction', 'process_completion_cli.py');
+    
+    if (!fs.existsSync(scriptPath)) {
+      return res.status(404).json({ 
+        success: false, 
+        error: `Completion processor script not found at ${scriptPath}` 
+      });
+    }
+
+    // Execute Python script with the selected ZIP file
+    const pythonProcess = spawn('python', [
+      scriptPath,
+      drive,
+      className,
+      zipPath
+    ], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+    });
+
+    let output = '';
+    let errorOutput = '';
+    const logs = [];
+
+    pythonProcess.stdout.on('data', (data) => {
+      const text = data.toString();
+      output += text;
+      
+      // Parse logs line by line, but skip JSON lines
+      text.split('\n').forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+          logs.push(trimmed);
+        }
+      });
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+      if (code === 0) {
+        res.json({ 
+          success: true, 
+          message: 'Completion processing completed',
+          logs: logs,
+          output: output
+        });
+      } else {
+        // Try to parse error from stderr (JSON response)
+        let errorMessage = 'Process failed';
+        try {
+          const jsonError = JSON.parse(errorOutput.trim());
+          if (jsonError.error) {
+            errorMessage = jsonError.error;
+          }
+        } catch (e) {
+          // If stderr isn't JSON, check if output contains JSON
+          try {
+            const jsonOutput = JSON.parse(output.trim());
+            if (jsonOutput.error) {
+              errorMessage = jsonOutput.error;
+            }
+          } catch (e2) {
+            // Use default error message
+          }
+        }
+        
+        res.json({ 
+          success: false, 
+          error: errorMessage,
+          logs: logs,
+          output: output,
+          errorOutput: errorOutput
+        });
+      }
+    });
+
+  } catch (error) {
+    console.error('Process selected completion error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Process completions (extract ZIP, combine PDFs, auto-assign 10 points)
+router.post('/process-completion', (req, res) => {
+  try {
+    const { drive, className } = req.body;
+
+    if (!drive || !className) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Drive and class name are required' 
+      });
+    }
+
+    // Path to the process completion CLI script
+    const scriptPath = path.resolve(__dirname, '..', '..', '..', 'Quiz-extraction', 'process_completion_cli.py');
+    
+    if (!fs.existsSync(scriptPath)) {
+      return res.status(404).json({ 
+        success: false, 
+        error: `Completion processor script not found at ${scriptPath}` 
+      });
+    }
+
+    // Execute Python script
+    const pythonProcess = spawn('python', [
+      scriptPath,
+      drive,
+      className
+    ], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+    });
+
+    let output = '';
+    let errorOutput = '';
+    const logs = [];
+    let responseSent = false;
+
+    pythonProcess.stdout.on('data', (data) => {
+      const text = data.toString();
+      output += text;
+      
+      // Try to parse JSON from stdout (for multiple ZIP files case)
+      try {
+        const jsonData = JSON.parse(text.trim());
+        if (jsonData.error === 'Multiple ZIP files found' && !responseSent) {
+          responseSent = true;
+          return res.json(jsonData);
+        }
+      } catch (e) {
+        // Not JSON, parse as regular logs
+        text.split('\n').forEach(line => {
+          if (line.trim()) {
+            logs.push(line.trim());
+          }
+        });
+      }
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+      if (responseSent) {
+        return; // Response already sent, don't send another one
+      }
+      
+      if (code === 0) {
+        res.json({ 
+          success: true, 
+          message: 'Completion processing completed',
+          logs: logs,
+          output: output
+        });
+      } else {
         res.json({ 
           success: false, 
           error: 'Process failed',
@@ -224,7 +458,7 @@ router.post('/process', (req, res) => {
     });
 
   } catch (error) {
-    console.error('Process quizzes error:', error);
+    console.error('Process completion error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -272,10 +506,11 @@ router.post('/extract-grades', (req, res) => {
       const text = data.toString();
       output += text;
       
-      // Parse logs line by line
+      // Parse logs line by line, but skip JSON lines
       text.split('\n').forEach(line => {
-        if (line.trim()) {
-          logs.push(line.trim());
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+          logs.push(trimmed);
         }
       });
     });
@@ -286,16 +521,46 @@ router.post('/extract-grades', (req, res) => {
 
     pythonProcess.on('close', (code) => {
       if (code === 0) {
+        // Try to parse JSON response from stderr
+        let parsedLogs = logs;
+        try {
+          const jsonResponse = JSON.parse(errorOutput.trim());
+          if (jsonResponse.logs && Array.isArray(jsonResponse.logs)) {
+            parsedLogs = jsonResponse.logs;
+          }
+        } catch (e) {
+          // If stderr isn't JSON, use the parsed logs from stdout
+        }
+        
         res.json({ 
           success: true, 
           message: 'Grade extraction completed',
-          logs: logs,
+          logs: parsedLogs,
           output: output
         });
       } else {
+        // Try to parse error from stderr (JSON response)
+        let errorMessage = 'Something went wrong with the extraction.';
+        try {
+          const jsonError = JSON.parse(errorOutput.trim());
+          if (jsonError.error) {
+            errorMessage = jsonError.error;
+          }
+        } catch (e) {
+          // If stderr isn't JSON, check if output contains JSON
+          try {
+            const jsonOutput = JSON.parse(output.trim());
+            if (jsonOutput.error) {
+              errorMessage = jsonOutput.error;
+            }
+          } catch (e2) {
+            // Use default friendly message
+          }
+        }
+        
         res.json({ 
           success: false, 
-          error: 'Extraction failed',
+          error: errorMessage,
           logs: logs,
           output: output,
           errorOutput: errorOutput
@@ -352,10 +617,11 @@ router.post('/split-pdf', (req, res) => {
       const text = data.toString();
       output += text;
       
-      // Parse logs line by line
+      // Parse logs line by line, but skip JSON lines
       text.split('\n').forEach(line => {
-        if (line.trim()) {
-          logs.push(line.trim());
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+          logs.push(trimmed);
         }
       });
     });
@@ -373,9 +639,28 @@ router.post('/split-pdf', (req, res) => {
           output: output
         });
       } else {
+        // Try to parse error from stderr (JSON response)
+        let errorMessage = 'Something ran into a problem with the split and zip.';
+        try {
+          const jsonError = JSON.parse(errorOutput.trim());
+          if (jsonError.error) {
+            errorMessage = jsonError.error;
+          }
+        } catch (e) {
+          // If stderr isn't JSON, check if output contains JSON
+          try {
+            const jsonOutput = JSON.parse(output.trim());
+            if (jsonOutput.error) {
+              errorMessage = jsonOutput.error;
+            }
+          } catch (e2) {
+            // Use default friendly message
+          }
+        }
+        
         res.json({ 
           success: false, 
-          error: 'PDF splitting failed',
+          error: errorMessage,
           logs: logs,
           output: output,
           errorOutput: errorOutput
@@ -581,10 +866,11 @@ router.post('/clear-data', (req, res) => {
       const text = data.toString();
       output += text;
       
-      // Parse logs line by line
+      // Parse logs line by line, but skip JSON lines
       text.split('\n').forEach(line => {
-        if (line.trim()) {
-          logs.push(line.trim());
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+          logs.push(trimmed);
         }
       });
     });

@@ -6,7 +6,6 @@ const path = require('path');
 const d2lRoutes = require('./routes/d2lRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 const makeupRoutes = require('./routes/makeupRoutes');
-const fileExtractorRoutes = require('./routes/fileExtractorRoutes');
 const serverRoutes = require('./routes/serverRoutes');
 
 const app = express();
@@ -25,7 +24,6 @@ app.get('/api/health', (req, res) => {
 app.use('/api/d2l', d2lRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/makeup', makeupRoutes);
-app.use('/api/file-extractor', fileExtractorRoutes);
 app.use('/api/server', serverRoutes);
 
 // Error handling middleware
