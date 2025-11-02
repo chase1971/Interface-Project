@@ -25,7 +25,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  position: relative;
   padding: 20px;
 }
 
@@ -43,6 +43,9 @@
   box-shadow: 0 0 15px var(--accent-glow);
   border-radius: 12px 12px 0 0;
   margin-bottom: 0;
+  margin-left: auto;
+  margin-right: auto;
+  position: relative;
 }
 
 .makeup-logo {
@@ -69,6 +72,10 @@
   box-shadow: 0 0 15px rgba(0, 179, 255, 0.15);
   border: 1px solid var(--divider);
   border-top: none;
+  margin: 0 auto;
+  position: relative;
+  min-height: calc(100vh - 120px);
+  z-index: 100;
 }
 
 .makeup-content {
@@ -389,6 +396,399 @@
   opacity: 1;
 }
 
+/* CLASS SELECT */
+.class-select {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1rem;
+  width: 100%;
+  padding: 12px;
+  background: rgba(13, 17, 23, 0.8);
+  color: var(--text-main);
+  border: 2px solid var(--divider);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.class-select:hover {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 10px rgba(0, 179, 255, 0.3);
+}
+
+.class-select:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 15px rgba(0, 179, 255, 0.5);
+}
+
+/* STUDENTS SIDEBAR */
+.students-sidebar {
+  position: fixed;
+  right: calc(50% + 350px + 20px);
+  top: 0;
+  width: 280px;
+  height: 100vh;
+  background: var(--bg-panel);
+  border: 2px solid var(--divider);
+  border-radius: 12px;
+  box-shadow: 2px 0 15px rgba(0, 179, 255, 0.15);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideInLeft 0.3s ease;
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.sidebar-header {
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--divider);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(13, 17, 23, 0.8);
+  flex-shrink: 0;
+}
+
+.sidebar-title {
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.9rem;
+  color: var(--accent-blue);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sidebar-selection-count-small {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  background: rgba(0, 179, 255, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--divider);
+  font-weight: 600;
+}
+
+.sidebar-students-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 100%;
+}
+
+.sidebar-student-item {
+  padding: 6px 10px;
+  background: rgba(13, 17, 23, 0.6);
+  border: 1px solid var(--divider);
+  border-radius: 4px;
+  color: var(--text-main);
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.sidebar-student-item:hover {
+  background: rgba(0, 179, 255, 0.1);
+  border-color: var(--accent-blue);
+  transform: translateX(2px);
+}
+
+.sidebar-student-item.selected {
+  background: rgba(144, 238, 144, 0.2);
+  border-color: #90EE90;
+  color: #90EE90;
+  font-weight: 600;
+}
+
+.sidebar-student-item.selected:hover {
+  background: rgba(144, 238, 144, 0.3);
+}
+
+
+.selection-count {
+  margin-top: 10px;
+  padding: 8px;
+  background: rgba(144, 238, 144, 0.1);
+  border: 1px solid #90EE90;
+  border-radius: 4px;
+  color: #90EE90;
+  font-size: 0.85rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* SCHEDULER TOGGLE BUTTON */
+.scheduler-toggle-btn {
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 0.85rem;
+  background: rgba(13, 17, 23, 0.8);
+  color: var(--accent-blue);
+  border: 2px solid var(--accent-blue);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.scheduler-toggle-btn:hover {
+  background: rgba(0, 179, 255, 0.1);
+  box-shadow: 0 0 10px rgba(0, 179, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+/* SCHEDULER SIDEBAR */
+.scheduler-sidebar {
+  position: fixed;
+  left: calc(50% + 350px + 20px);
+  top: 0;
+  width: 320px;
+  height: 100vh;
+  background: var(--bg-panel);
+  border: 2px solid var(--divider);
+  border-radius: 12px;
+  box-shadow: -2px 0 15px rgba(0, 179, 255, 0.15);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.scheduler-header {
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--divider);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(13, 17, 23, 0.8);
+  flex-shrink: 0;
+}
+
+.scheduler-title {
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.9rem;
+  color: var(--accent-blue);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.scheduler-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  border-radius: 4px;
+}
+
+.scheduler-close-btn:hover {
+  background: rgba(0, 179, 255, 0.1);
+  color: var(--accent-blue);
+  transform: scale(1.1);
+}
+
+.scheduler-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.scheduler-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scheduler-label {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.scheduler-date-input,
+.scheduler-text-input {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.9rem;
+  padding: 10px;
+  background: rgba(13, 17, 23, 0.8);
+  color: var(--text-main);
+  border: 2px solid var(--divider);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.scheduler-text-input {
+  text-align: center;
+  font-weight: bold;
+  font-size: 1.1rem;
+  letter-spacing: 4px;
+  cursor: text;
+}
+
+.scheduler-date-input:hover,
+.scheduler-text-input:hover {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 10px rgba(0, 179, 255, 0.3);
+}
+
+.scheduler-date-input:focus,
+.scheduler-text-input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 15px rgba(0, 179, 255, 0.5);
+}
+
+.duration-selectors {
+  display: flex;
+  gap: 10px;
+}
+
+.duration-select {
+  flex: 1;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.9rem;
+  padding: 10px;
+  background: rgba(13, 17, 23, 0.8);
+  color: var(--text-main);
+  border: 2px solid var(--divider);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.duration-select:hover {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 10px rgba(0, 179, 255, 0.3);
+}
+
+.duration-select:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 15px rgba(0, 179, 255, 0.5);
+}
+
+.specify-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.specify-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.9rem;
+  color: var(--text-main);
+  cursor: pointer;
+  user-select: none;
+  padding: 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.specify-radio-label:hover {
+  background: rgba(0, 179, 255, 0.05);
+}
+
+.specify-radio {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--accent-blue);
+}
+
+.note-card-preview {
+  margin-top: 10px;
+  padding: 12px;
+  background: rgba(13, 17, 23, 0.6);
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+}
+
+.note-card-text {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+.custom-specify-input {
+  margin-top: 10px;
+  font-family: "Rajdhani", sans-serif;
+  font-size: 0.9rem;
+  padding: 10px;
+  background: rgba(13, 17, 23, 0.8);
+  color: var(--text-main);
+  border: 2px solid var(--divider);
+  border-radius: 6px;
+  resize: vertical;
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+.custom-specify-input:hover {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 10px rgba(0, 179, 255, 0.3);
+}
+
+.custom-specify-input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 15px rgba(0, 179, 255, 0.5);
+}
+
+.custom-specify-input::placeholder {
+  color: var(--text-dim);
+}
+
 /* RESPONSIVE */
 @media (max-width: 768px) {
   .makeup-container {
@@ -413,6 +813,14 @@
   .nav-section > * {
     width: 100%;
     max-width: 200px;
+  }
+
+}
+
+@media (max-width: 1024px) {
+  .students-sidebar {
+    width: 250px;
+    margin-right: 15px;
   }
 }
 
