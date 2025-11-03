@@ -67,25 +67,37 @@ function D2LInterface() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ classCode: className })
+      }).catch((fetchError) => {
+        // Network error - backend might not be running
+        if (fetchError.name === 'TypeError' && fetchError.message.includes('fetch')) {
+          throw new Error('Cannot connect to backend server. Please ensure the backend is running on port 5000.');
+        }
+        throw fetchError;
       });
+
+      if (!response.ok) {
+        throw new Error(`Server returned error: ${response.status} ${response.statusText}`);
+      }
 
       let result;
       try {
         result = await response.json();
-      } catch {
+      } catch (jsonError) {
         // If the backend ever sends non-JSON again, don't crash the UI.
         const text = await response.text().catch(() => '');
         console.error('Non-JSON from /select-class:', text);
         throw new Error('Invalid JSON returned from server');
       }
+      
       if (result.success) {
         setStatus(`Opened ${className} in persistent browser`);
         setStatusColor("green");
       } else {
-        setStatus("Class selection failed: " + result.error);
+        setStatus("Class selection failed: " + (result.error || 'Unknown error'));
         setStatusColor("red");
       }
     } catch (error) {
+      console.error('Class selection error:', error);
       setStatus("Class selection error: " + error.message);
       setStatusColor("red");
     }
