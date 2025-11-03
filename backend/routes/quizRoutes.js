@@ -274,7 +274,7 @@ router.post('/process', (req, res) => {
 // Process completions with specific ZIP file selection
 router.post('/process-completion-selected', (req, res) => {
   try {
-    const { drive, className, zipPath } = req.body;
+    const { drive, className, zipPath, dontOverride } = req.body;
 
     if (!drive || !className || !zipPath) {
       return res.status(400).json({ 
@@ -294,12 +294,11 @@ router.post('/process-completion-selected', (req, res) => {
     }
 
     // Execute Python script with the selected ZIP file
-    const pythonProcess = spawn('python', [
-      scriptPath,
-      drive,
-      className,
-      zipPath
-    ], {
+    const args = [scriptPath, drive, className, zipPath];
+    if (dontOverride) {
+      args.push('--dont-override');
+    }
+    const pythonProcess = spawn('python', args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
     });
@@ -375,7 +374,7 @@ router.post('/process-completion-selected', (req, res) => {
 // Process completions (extract ZIP, combine PDFs, auto-assign 10 points)
 router.post('/process-completion', (req, res) => {
   try {
-    const { drive, className } = req.body;
+    const { drive, className, dontOverride } = req.body;
 
     if (!drive || !className) {
       return res.status(400).json({ 
@@ -395,11 +394,11 @@ router.post('/process-completion', (req, res) => {
     }
 
     // Execute Python script
-    const pythonProcess = spawn('python', [
-      scriptPath,
-      drive,
-      className
-    ], {
+    const args = [scriptPath, drive, className];
+    if (dontOverride) {
+      args.push('--dont-override');
+    }
+    const pythonProcess = spawn('python', args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
     });

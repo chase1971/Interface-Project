@@ -18,6 +18,7 @@ function QuizGrader() {
   const [showZipSelection, setShowZipSelection] = useState(false);
   const [zipSelectionMode, setZipSelectionMode] = useState('quiz'); // 'quiz' or 'completion'
   const [extendedLogging, setExtendedLogging] = useState(false); // Regular logging by default
+  const [dontOverride, setDontOverride] = useState(false); // "Don't override" checkbox state
   const logContainerRef = useRef(null);
 
   // Auto-scroll logs to bottom when new messages arrive or logging mode changes
@@ -399,7 +400,7 @@ function QuizGrader() {
     addLog('🔍 Searching for Canvas ZIP in Downloads...');
     
     try {
-      const result = await processCompletion(drive, selectedClass, addLog);
+      const result = await processCompletion(drive, selectedClass, dontOverride, addLog);
       
       if (result.success) {
         addLog('✅ Completion processing completed!');
@@ -437,7 +438,7 @@ function QuizGrader() {
     addLog(`📁 Processing selected ZIP file: ${zipPath.split('\\').pop()}`);
     
     try {
-      const result = await processSelectedCompletion(drive, selectedClass, zipPath, addLog);
+      const result = await processSelectedCompletion(drive, selectedClass, zipPath, dontOverride, addLog);
       
       if (result.success) {
         addLog('✅ Completion processing completed!');
@@ -713,9 +714,18 @@ function QuizGrader() {
                 {logs.length === 0 ? (
                   <div className="log-entry log-empty">Awaiting commands...</div>
                 ) : (
-                  (extendedLogging ? logs : logs.filter(shouldShowLog)).map((log, index) => (
-                    <div key={`log-${index}-${log.substring(0, 20)}`} className="log-entry">{log}</div>
-                  ))
+                  (extendedLogging ? logs : logs.filter(shouldShowLog)).map((log, index) => {
+                    const isError = log.includes('❌');
+                    return (
+                      <div 
+                        key={`log-${index}-${log.substring(0, 20)}`} 
+                        className="log-entry"
+                        style={isError ? { color: '#ff4444' } : {}}
+                      >
+                        {log}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -788,6 +798,21 @@ function QuizGrader() {
                 >
                   {processingCompletion ? 'Processing...' : 'Process Completion'}
                 </button>
+              </div>
+              <div style={{ marginTop: '10px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9em', color: '#666' }}>
+                  <input
+                    type="checkbox"
+                    checked={dontOverride}
+                    onChange={(e) => setDontOverride(e.target.checked)}
+                  />
+                  <span>Don't override</span>
+                </label>
+                <p style={{ fontSize: '0.85em', color: '#888', marginTop: '4px', marginLeft: '24px' }}>
+                  {dontOverride 
+                    ? 'New column will be added after column E' 
+                    : 'Column E will be updated (existing behavior)'}
+                </p>
               </div>
             </div>
 

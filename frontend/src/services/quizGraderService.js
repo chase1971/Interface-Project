@@ -101,7 +101,7 @@ export const processSelectedQuiz = async (drive, selectedClass, zipPath, addLog)
   }
 };
 
-export const processCompletion = async (drive, selectedClass, addLog) => {
+export const processCompletion = async (drive, selectedClass, dontOverride, addLog) => {
   try {
     addLog('📡 Sending completion processing request to backend...');
     
@@ -112,7 +112,8 @@ export const processCompletion = async (drive, selectedClass, addLog) => {
       },
       body: JSON.stringify({
         drive,
-        className: selectedClass
+        className: selectedClass,
+        dontOverride: dontOverride || false
       })
     });
 
@@ -137,7 +138,7 @@ export const processCompletion = async (drive, selectedClass, addLog) => {
   }
 };
 
-export const processSelectedCompletion = async (drive, selectedClass, zipPath, addLog) => {
+export const processSelectedCompletion = async (drive, selectedClass, zipPath, dontOverride, addLog) => {
   try {
     addLog('📡 Sending selected completion processing request to backend...');
     
@@ -149,7 +150,8 @@ export const processSelectedCompletion = async (drive, selectedClass, zipPath, a
       body: JSON.stringify({
         drive,
         className: selectedClass,
-        zipPath
+        zipPath,
+        dontOverride: dontOverride || false
       })
     });
 
