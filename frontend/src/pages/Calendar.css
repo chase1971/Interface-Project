@@ -1,0 +1,1788 @@
+/* === CALENDAR INTERFACE STYLING === */
+/* Based on the futuristic dark theme */
+
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Rajdhani:wght@400;600&display=swap");
+
+:root {
+  --bg-dark: #0d1117;
+  --bg-panel: #111827;
+  --accent-blue: #00b3ff;
+  --accent-red: #ff0055;
+  --accent-green: #4CAF50;
+  --accent-glow: rgba(0, 179, 255, 0.4);
+  --text-main: #e2e8f0;
+  --text-dim: #94a3b8;
+  --divider: rgba(0, 179, 255, 0.2);
+  --button-bg: #f5f5f5;
+  --button-hover: #e0e0e0;
+  --selected-bg: #90EE90;
+}
+
+.calendar-container {
+  font-family: "Rajdhani", sans-serif;
+  background: radial-gradient(circle at top right, #0f172a 0%, #000000 100%);
+  color: var(--text-main);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: row;
+  padding: 0;
+  position: relative;
+}
+
+/* Course Sidebar */
+.course-sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 220px;
+  height: 100vh;
+  background: var(--bg-panel);
+  border-right: 2px solid var(--divider);
+  box-shadow: 2px 0 15px rgba(0, 179, 255, 0.15);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.course-sidebar-header {
+  padding: 15px;
+  border-bottom: 2px solid var(--divider);
+  background: rgba(13, 17, 23, 0.9);
+}
+
+.course-sidebar-title {
+  font-family: "Orbitron", sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--accent-blue);
+  text-shadow: 0 0 10px var(--accent-blue);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.course-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.course-item {
+  padding: 12px;
+  background: rgba(13, 17, 23, 0.6);
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.course-item:hover {
+  background: rgba(0, 179, 255, 0.1);
+  border-color: var(--accent-blue);
+  transform: translateX(3px);
+  box-shadow: 0 0 8px rgba(0, 179, 255, 0.2);
+}
+
+.course-item.selected {
+  background: rgba(0, 179, 255, 0.2);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 12px rgba(0, 179, 255, 0.4);
+}
+
+.course-item.no-calendar {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.course-item.no-calendar:hover {
+  transform: none;
+  background: rgba(13, 17, 23, 0.6);
+  border-color: var(--divider);
+  box-shadow: none;
+}
+
+.course-name {
+  font-family: "Orbitron", sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--accent-blue);
+  margin-bottom: 4px;
+}
+
+.course-schedule {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.no-calendar-badge {
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: rgba(255, 0, 85, 0.1);
+  border: 1px solid var(--accent-red);
+  border-radius: 4px;
+  color: var(--accent-red);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Semester Button Wrapper */
+.semester-button-wrapper {
+  position: relative;
+  margin-top: 8px;
+}
+
+.semester-toggle-button {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 193, 7, 0.1);
+  border: 2px solid #ffc107;
+  border-radius: 6px;
+  color: #ffc107;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.semester-toggle-button:hover {
+  background: rgba(255, 193, 7, 0.2);
+  box-shadow: 0 0 10px rgba(255, 193, 7, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Semester Menu (Slide-out) */
+.semester-menu {
+  position: fixed;
+  left: 220px;
+  top: 50px;
+  width: 160px;
+  background: var(--bg-panel);
+  border: 2px solid var(--divider);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  box-shadow: 2px 0 15px rgba(0, 179, 255, 0.15);
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.semester-menu-buttons {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  gap: 8px;
+}
+
+.semester-menu-button {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 193, 7, 0.1);
+  border: 2px solid #ffc107;
+  border-radius: 6px;
+  color: #ffc107;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.semester-menu-button:hover {
+  background: rgba(255, 193, 7, 0.2);
+  box-shadow: 0 0 10px rgba(255, 193, 7, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Semester Sidebar */
+.semester-sidebar {
+  position: fixed;
+  left: 220px;
+  top: 0;
+  width: 180px;
+  height: 100vh;
+  background: var(--bg-panel);
+  border-right: 2px solid var(--divider);
+  box-shadow: 2px 0 15px rgba(0, 179, 255, 0.15);
+  z-index: 99;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.semester-sidebar-header {
+  padding: 15px;
+  border-bottom: 2px solid var(--divider);
+  background: rgba(13, 17, 23, 0.9);
+}
+
+.semester-sidebar-title {
+  font-family: "Orbitron", sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--accent-blue);
+  text-shadow: 0 0 10px var(--accent-blue);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.semester-buttons-vertical {
+  display: flex;
+  flex-direction: column;
+  padding: 15px;
+  gap: 10px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.semester-button-vertical {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 193, 7, 0.1);
+  border: 2px solid #ffc107;
+  border-radius: 6px;
+  color: #ffc107;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.semester-button-vertical:hover {
+  background: rgba(255, 193, 7, 0.2);
+  box-shadow: 0 0 10px rgba(255, 193, 7, 0.4);
+  transform: translateY(-2px);
+}
+
+.calendar-main-wrapper {
+  margin-left: 220px; /* 220px (course sidebar) */
+  width: calc(100% - 220px);
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.calendar-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-size: 1.5rem;
+  color: var(--accent-blue);
+  text-shadow: 0 0 10px var(--accent-blue);
+}
+
+/* HEADER */
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  border-bottom: 2px solid var(--divider);
+  background: rgba(13, 17, 23, 0.9);
+  box-shadow: 0 0 15px var(--accent-glow);
+  border-radius: 12px 12px 0 0;
+  margin-bottom: 0;
+  position: relative;
+}
+
+.header-buttons-left {
+  position: absolute;
+  left: 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.future-planning-button,
+.clear-calendar-button {
+  padding: 0.5rem 1rem;
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid var(--accent-green);
+  border-radius: 6px;
+  color: var(--accent-green);
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.clear-calendar-button {
+  background: rgba(244, 67, 54, 0.1);
+  border-color: #f44336;
+  color: #f44336;
+}
+
+.future-planning-button:hover {
+  background: rgba(76, 175, 80, 0.2);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+  transform: translateY(-2px);
+}
+
+.clear-calendar-button:hover {
+  background: rgba(244, 67, 54, 0.2);
+  box-shadow: 0 0 10px rgba(244, 67, 54, 0.4);
+  transform: translateY(-2px);
+}
+
+.calendar-logo {
+  height: 50px;
+  filter: drop-shadow(0 0 10px var(--accent-blue));
+}
+
+.calendar-title {
+  font-family: "Orbitron", sans-serif;
+  font-weight: 800;
+  font-size: 1.4rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--accent-blue);
+  text-shadow: 0 0 10px var(--accent-blue);
+}
+
+/* Pending Changes Banner */
+.pending-changes-banner {
+  background: rgba(255, 193, 7, 0.15);
+  border: 2px solid rgba(255, 193, 7, 0.5);
+  border-left: 4px solid #ffc107;
+  padding: 1rem 1.5rem;
+  margin: 1rem auto;
+  max-width: 1400px;
+  border-radius: 8px;
+  box-shadow: 0 0 15px rgba(255, 193, 7, 0.3);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pending-changes-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.pending-changes-text {
+  color: #ffc107;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  flex: 1;
+  min-width: 300px;
+}
+
+.pending-changes-buttons {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.accept-changes-button {
+  padding: 0.6rem 1.5rem;
+  background: rgba(76, 175, 80, 0.2);
+  border: 2px solid var(--accent-green);
+  border-radius: 6px;
+  color: var(--accent-green);
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.accept-changes-button:hover {
+  background: rgba(76, 175, 80, 0.3);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+  transform: translateY(-2px);
+}
+
+.discard-changes-button {
+  padding: 0.6rem 1.5rem;
+  background: rgba(158, 158, 158, 0.2);
+  border: 2px solid #9e9e9e;
+  border-radius: 6px;
+  color: #9e9e9e;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.discard-changes-button:hover {
+  background: rgba(158, 158, 158, 0.3);
+  box-shadow: 0 0 10px rgba(158, 158, 158, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Import Calendar Button */
+.import-calendar-button {
+  padding: 0.8rem 1.5rem;
+  background: rgba(0, 179, 255, 0.2);
+  border: 2px solid var(--accent-blue);
+  border-radius: 6px;
+  color: var(--accent-blue);
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 1rem;
+}
+
+.import-calendar-button:hover {
+  background: rgba(0, 179, 255, 0.3);
+  box-shadow: 0 0 10px rgba(0, 179, 255, 0.5);
+  transform: translateY(-2px);
+}
+
+.import-calendar-button-small {
+  padding: 0.3rem 0.6rem;
+  background: rgba(0, 179, 255, 0.15);
+  border: 1px solid var(--accent-blue);
+  border-radius: 4px;
+  color: var(--accent-blue);
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 0.25rem;
+}
+
+.import-calendar-button-small:hover {
+  background: rgba(0, 179, 255, 0.25);
+  box-shadow: 0 0 8px rgba(0, 179, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.back-button {
+  position: absolute;
+  right: 1.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(0, 179, 255, 0.1);
+  border: 1px solid var(--accent-blue);
+  border-radius: 6px;
+  color: var(--accent-blue);
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.back-button:hover {
+  background: rgba(0, 179, 255, 0.2);
+  box-shadow: 0 0 10px var(--accent-glow);
+  transform: translateY(-2px);
+}
+
+/* MAIN CONTENT */
+.calendar-main {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  background: var(--bg-panel);
+  border-radius: 12px;
+  box-shadow: 0 0 15px rgba(0, 179, 255, 0.15);
+  border: 1px solid var(--divider);
+  padding: 20px;
+}
+
+/* No Calendar Message */
+.no-calendar-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 40px;
+}
+
+.no-calendar-content {
+  text-align: center;
+  padding: 40px;
+  background: rgba(13, 17, 23, 0.5);
+  border: 2px solid var(--divider);
+  border-radius: 12px;
+  max-width: 500px;
+}
+
+.no-calendar-content h2 {
+  font-family: "Orbitron", sans-serif;
+  font-size: 1.5rem;
+  color: var(--accent-blue);
+  margin-bottom: 15px;
+}
+
+.no-calendar-content p {
+  color: var(--text-dim);
+  font-size: 1rem;
+}
+
+/* CONTROLS */
+.calendar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 15px;
+  background: rgba(13, 17, 23, 0.5);
+  border-radius: 8px;
+  border: 1px solid var(--divider);
+  position: relative;
+}
+
+.controls-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.controls-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.month-year {
+  font-family: "Orbitron", sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--accent-blue);
+  text-shadow: 0 0 10px var(--accent-blue);
+  margin: 0;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.nav-button {
+  padding: 0.6rem 1.2rem;
+  background: rgba(0, 179, 255, 0.1);
+  border: 1px solid var(--accent-blue);
+  border-radius: 6px;
+  color: var(--accent-blue);
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.nav-button:hover {
+  background: rgba(0, 179, 255, 0.2);
+  box-shadow: 0 0 10px var(--accent-glow);
+  transform: translateY(-2px);
+}
+
+.today-button {
+  background: rgba(76, 175, 80, 0.1);
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+}
+
+.today-button:hover {
+  background: rgba(76, 175, 80, 0.2);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+}
+
+.edit-mode-active {
+  background: rgba(255, 193, 7, 0.2) !important;
+  border-color: #ffc107 !important;
+  color: #ffc107 !important;
+}
+
+.edit-mode-active:hover {
+  background: rgba(255, 193, 7, 0.3) !important;
+  box-shadow: 0 0 10px rgba(255, 193, 7, 0.4) !important;
+}
+
+.undo-button {
+  background: rgba(255, 152, 0, 0.2) !important;
+  border-color: #ff9800 !important;
+  color: #ff9800 !important;
+}
+
+.undo-button:hover:not(.disabled):not(:disabled) {
+  background: rgba(255, 152, 0, 0.3) !important;
+  box-shadow: 0 0 10px rgba(255, 152, 0, 0.4) !important;
+}
+
+.undo-button.disabled,
+.undo-button:disabled {
+  background: rgba(100, 100, 100, 0.1) !important;
+  border-color: var(--text-dim) !important;
+  color: var(--text-dim) !important;
+  cursor: not-allowed !important;
+  opacity: 0.5 !important;
+}
+
+.edit-mode-banner {
+  background: rgba(255, 193, 7, 0.15);
+  border: 2px solid rgba(255, 193, 7, 0.5);
+  border-left: 4px solid #ffc107;
+  padding: 0.75rem 1rem;
+  margin-bottom: 15px;
+  border-radius: 6px;
+  text-align: center;
+  color: #ffc107;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  animation: slideDown 0.3s ease-out;
+}
+
+/* CALENDAR GRID */
+.calendar-grid {
+  margin-bottom: 20px;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.weekday-header {
+  padding: 10px;
+  text-align: center;
+  font-family: "Orbitron", sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--accent-blue);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: rgba(0, 179, 255, 0.1);
+  border: 1px solid var(--divider);
+  border-radius: 4px;
+}
+
+.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  align-items: start;
+}
+
+.calendar-day {
+  height: 90px;
+  max-height: 90px;
+  padding: 6px;
+  background: rgba(13, 17, 23, 0.5);
+  border: 1px solid var(--divider);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.calendar-day:hover {
+  background: rgba(0, 179, 255, 0.1);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 8px rgba(0, 179, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.calendar-day.today {
+  background: rgba(0, 179, 255, 0.15);
+  border: 2px solid var(--accent-blue);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+/* Today styling for class schedule days - keep the colored background but add blue border */
+.calendar-day.today.class-schedule-day-quiz,
+.calendar-day.today.class-schedule-day-test,
+.calendar-day.today.class-schedule-day-exam,
+.calendar-day.today.class-schedule-day-holiday {
+  border: 2px solid var(--accent-blue);
+  box-shadow: 0 0 12px var(--accent-glow), 0 0 8px rgba(0, 179, 255, 0.3);
+}
+
+.calendar-day.selected {
+  background: rgba(144, 238, 144, 0.2);
+  border: 2px solid var(--selected-bg);
+  box-shadow: 0 0 12px rgba(144, 238, 144, 0.4);
+}
+
+.calendar-day.drag-over {
+  background: rgba(0, 179, 255, 0.25) !important;
+  border: 2px dashed var(--accent-blue) !important;
+  box-shadow: 0 0 15px rgba(0, 179, 255, 0.5) !important;
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+}
+
+.day-number {
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-main);
+  margin-bottom: 3px;
+  z-index: 1;
+  position: relative;
+}
+
+/* Class schedule text styling (for class calendar mode) */
+.class-schedule-text {
+  flex: 1;
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 1.4rem;
+  color: var(--text-main);
+  line-height: 1.3;
+  padding: 2px 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  z-index: 1;
+  position: relative;
+}
+
+/* Full cell background colors for class schedule days */
+.calendar-day.class-schedule-day-quiz {
+  background: rgba(255, 152, 0, 0.3) !important;
+  border-left: 4px solid #ff9800;
+}
+
+.calendar-day.class-schedule-day-quiz:hover {
+  background: rgba(255, 152, 0, 0.4) !important;
+  box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+}
+
+.calendar-day.class-schedule-day-quiz .day-number {
+  color: #ffb74d;
+  font-weight: 700;
+}
+
+.calendar-day.class-schedule-day-quiz .class-schedule-text {
+  color: #ffd54f;
+  font-weight: 600;
+}
+
+.calendar-day.class-schedule-day-test {
+  background: rgba(244, 67, 54, 0.3) !important;
+  border-left: 4px solid #f44336;
+}
+
+.calendar-day.class-schedule-day-test:hover {
+  background: rgba(244, 67, 54, 0.4) !important;
+  box-shadow: 0 0 10px rgba(244, 67, 54, 0.5);
+}
+
+.calendar-day.class-schedule-day-test .day-number {
+  color: #ef5350;
+  font-weight: 700;
+}
+
+.calendar-day.class-schedule-day-test .class-schedule-text {
+  color: #ffcdd2;
+  font-weight: 600;
+}
+
+.calendar-day.class-schedule-day-exam {
+  background: rgba(156, 39, 176, 0.3) !important;
+  border-left: 4px solid #9c27b0;
+}
+
+.calendar-day.class-schedule-day-exam:hover {
+  background: rgba(156, 39, 176, 0.4) !important;
+  box-shadow: 0 0 10px rgba(156, 39, 176, 0.5);
+}
+
+.calendar-day.class-schedule-day-exam .day-number {
+  color: #ba68c8;
+  font-weight: 700;
+}
+
+.calendar-day.class-schedule-day-exam .class-schedule-text {
+  color: #ce93d8;
+  font-weight: 700;
+}
+
+.calendar-day.class-schedule-day-holiday {
+  background: rgba(255, 193, 7, 0.3) !important;
+  border-left: 4px solid #ffc107;
+}
+
+.calendar-day.class-schedule-day-holiday:hover {
+  background: rgba(255, 193, 7, 0.4) !important;
+  box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+}
+
+.calendar-day.class-schedule-day-holiday .day-number {
+  color: #ffd54f;
+  font-weight: 700;
+}
+
+.calendar-day.class-schedule-day-holiday .class-schedule-text {
+  color: #fff9c4;
+  font-weight: 600;
+}
+
+.day-assignments {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Shrink text when there are multiple assignments */
+.day-assignments[data-count="2"] .assignment-item {
+  font-size: 0.7rem;
+  padding: 3px 5px;
+}
+
+.day-assignments[data-count="2"] .assignment-name {
+  font-size: 0.7rem;
+}
+
+.day-assignments[data-count="2"] .assignment-time {
+  font-size: 0.65rem;
+}
+
+.day-assignments[data-count="3"] .assignment-item {
+  font-size: 0.65rem;
+  padding: 2px 4px;
+}
+
+.day-assignments[data-count="3"] .assignment-name {
+  font-size: 0.65rem;
+  line-height: 1.2;
+  margin-bottom: 0;
+}
+
+.day-assignments[data-count="3"] .assignment-time {
+  font-size: 0.6rem;
+  line-height: 1.1;
+  margin-top: 0;
+}
+
+.day-assignments[data-count="4"] .assignment-name,
+.day-assignments[data-count="5"] .assignment-name,
+.day-assignments[data-count="6"] .assignment-name,
+.day-assignments[data-count="7"] .assignment-name {
+  margin-bottom: 0;
+}
+
+.day-assignments[data-count="4"] .assignment-time,
+.day-assignments[data-count="5"] .assignment-time,
+.day-assignments[data-count="6"] .assignment-time,
+.day-assignments[data-count="7"] .assignment-time {
+  margin-top: 0;
+}
+
+/* When there are 4+ assignments, shrink even more */
+.day-assignments[data-count="4"] .assignment-item,
+.day-assignments[data-count="5"] .assignment-item,
+.day-assignments[data-count="6"] .assignment-item,
+.day-assignments[data-count="7"] .assignment-item {
+  font-size: 0.6rem;
+  padding: 2px 3px;
+}
+
+.day-assignments[data-count="4"] .assignment-name,
+.day-assignments[data-count="5"] .assignment-name,
+.day-assignments[data-count="6"] .assignment-name,
+.day-assignments[data-count="7"] .assignment-name {
+  font-size: 0.6rem;
+  line-height: 1.1;
+}
+
+.day-assignments[data-count="4"] .assignment-time,
+.day-assignments[data-count="5"] .assignment-time,
+.day-assignments[data-count="6"] .assignment-time,
+.day-assignments[data-count="7"] .assignment-time {
+  font-size: 0.55rem;
+  line-height: 1;
+}
+
+.assignment-item {
+  font-size: 0.75rem;
+  padding: 4px 6px;
+  background: rgba(0, 179, 255, 0.15);
+  border-left: 3px solid var(--accent-blue);
+  border-radius: 3px;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.assignment-item:hover {
+  background: rgba(0, 179, 255, 0.25);
+  transform: translateX(2px);
+  box-shadow: 0 0 6px rgba(0, 179, 255, 0.3);
+}
+
+.assignment-item.has-due-date {
+  border-left-color: var(--accent-red);
+  background: rgba(255, 0, 85, 0.15);
+}
+
+.assignment-item.has-due-date:hover {
+  background: rgba(255, 0, 85, 0.25);
+  box-shadow: 0 0 6px rgba(255, 0, 85, 0.3);
+}
+
+.assignment-item.has-start-date {
+  border-left-color: var(--accent-blue);
+}
+
+.assignment-item.draggable {
+  cursor: grab;
+  user-select: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.assignment-item.draggable:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 179, 255, 0.4);
+}
+
+.assignment-item.draggable:active {
+  cursor: grabbing;
+}
+
+.assignment-item.dragging {
+  opacity: 0.3;
+  transform: scale(0.95);
+  pointer-events: none;
+}
+
+.assignment-item.being-dragged {
+  opacity: 0.3;
+  transform: scale(0.95);
+}
+
+/* Class starts marker styling */
+.assignment-item.class-starts-marker {
+  background: linear-gradient(135deg, rgba(0, 179, 255, 0.2), rgba(0, 255, 179, 0.2));
+  border: 2px solid var(--accent-blue);
+  border-style: dashed;
+  font-weight: 700;
+  color: var(--accent-blue);
+  cursor: default;
+  pointer-events: none;
+}
+
+.assignment-item.class-starts-marker .assignment-name {
+  color: var(--accent-blue);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Class schedule item styling - Quiz (Orange/Amber) */
+.assignment-item.class-schedule-item.class-schedule-quiz {
+  background: rgba(255, 152, 0, 0.2);
+  border-left: 3px solid #ff9800;
+  box-shadow: 0 0 4px rgba(255, 152, 0, 0.3);
+}
+
+.assignment-item.class-schedule-item.class-schedule-quiz:hover {
+  background: rgba(255, 152, 0, 0.3);
+  box-shadow: 0 0 8px rgba(255, 152, 0, 0.5);
+}
+
+.assignment-item.class-schedule-item.class-schedule-quiz .assignment-name {
+  color: #ffb74d;
+  font-weight: 600;
+}
+
+/* Class schedule item styling - Test (Red) */
+.assignment-item.class-schedule-item.class-schedule-test {
+  background: rgba(244, 67, 54, 0.2);
+  border-left: 3px solid #f44336;
+  box-shadow: 0 0 4px rgba(244, 67, 54, 0.3);
+}
+
+.assignment-item.class-schedule-item.class-schedule-test:hover {
+  background: rgba(244, 67, 54, 0.3);
+  box-shadow: 0 0 8px rgba(244, 67, 54, 0.5);
+}
+
+.assignment-item.class-schedule-item.class-schedule-test .assignment-name {
+  color: #ef5350;
+  font-weight: 600;
+}
+
+/* Class schedule item styling - Final Exam (Purple) */
+.assignment-item.class-schedule-item.class-schedule-exam {
+  background: rgba(156, 39, 176, 0.2);
+  border-left: 3px solid #9c27b0;
+  box-shadow: 0 0 4px rgba(156, 39, 176, 0.3);
+}
+
+.assignment-item.class-schedule-item.class-schedule-exam:hover {
+  background: rgba(156, 39, 176, 0.3);
+  box-shadow: 0 0 8px rgba(156, 39, 176, 0.5);
+}
+
+.assignment-item.class-schedule-item.class-schedule-exam .assignment-name {
+  color: #ba68c8;
+  font-weight: 700;
+}
+
+/* Class schedule item styling - Holiday (Gold/Yellow) */
+.assignment-item.class-schedule-item.class-schedule-holiday {
+  background: rgba(255, 193, 7, 0.25);
+  border-left: 3px solid #ffc107;
+  box-shadow: 0 0 4px rgba(255, 193, 7, 0.4);
+}
+
+.assignment-item.class-schedule-item.class-schedule-holiday:hover {
+  background: rgba(255, 193, 7, 0.35);
+  box-shadow: 0 0 8px rgba(255, 193, 7, 0.6);
+}
+
+.assignment-item.class-schedule-item.class-schedule-holiday .assignment-name {
+  color: #ffd54f;
+  font-weight: 600;
+}
+
+.assignment-name {
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.3;
+  margin-bottom: 2px;
+}
+
+
+.assignment-time {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  font-style: italic;
+  line-height: 1.2;
+}
+
+.assignment-time.due-time {
+  color: var(--accent-red);
+  font-weight: 600;
+}
+
+.assignment-more {
+  font-size: 0.65rem;
+  color: var(--accent-blue);
+  font-weight: 600;
+  text-align: center;
+  padding: 3px 4px;
+  margin-top: auto;
+  background: rgba(0, 179, 255, 0.15);
+  border-radius: 3px;
+  border: 1px dashed var(--accent-blue);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.assignment-more:hover {
+  background: rgba(0, 179, 255, 0.25);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 6px rgba(0, 179, 255, 0.3);
+}
+
+/* SELECTED DATE PANEL */
+.selected-date-panel {
+  margin-top: 20px;
+  padding: 20px;
+  background: rgba(13, 17, 23, 0.5);
+  border-radius: 8px;
+  border: 1px solid var(--divider);
+}
+
+.selected-date-title {
+  font-family: "Orbitron", sans-serif;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--accent-blue);
+  text-shadow: 0 0 10px var(--accent-blue);
+  margin-bottom: 15px;
+}
+
+.selected-assignments {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assignment-card {
+  padding: 12px;
+  background: rgba(0, 179, 255, 0.05);
+  border-left: 3px solid var(--accent-blue);
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.assignment-card:hover {
+  background: rgba(0, 179, 255, 0.1);
+  transform: translateX(5px);
+}
+
+.assignment-name {
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+.assignment-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.assignment-date {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.assignment-date.due-date {
+  color: var(--accent-red);
+}
+
+.date-label {
+  font-weight: 600;
+  color: var(--accent-blue);
+}
+
+.no-assignments {
+  text-align: center;
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 20px;
+}
+
+/* EXPANDED MODAL */
+.expanded-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.expanded-day-box {
+  background: var(--bg-panel);
+  border: 2px solid var(--accent-blue);
+  border-radius: 12px;
+  box-shadow: 0 0 30px var(--accent-glow);
+  width: 350px;
+  max-width: 90vw;
+  max-height: 400px;
+  overflow: hidden;
+  animation: zoomIn 0.3s ease;
+  position: absolute;
+  pointer-events: auto;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes zoomIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.expanded-day-header,
+.expanded-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  padding-right: 40px;
+  border-bottom: 2px solid var(--divider);
+  background: rgba(0, 179, 255, 0.1);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.expanded-day-title,
+.expanded-date-title {
+  font-family: "Orbitron", sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--accent-blue);
+  text-shadow: 0 0 10px var(--accent-blue);
+  margin: 0;
+  line-height: 1.1;
+}
+
+.close-expanded,
+.close-expanded-modal {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: transparent;
+  border: 2px solid var(--accent-blue);
+  color: var(--accent-blue);
+  font-size: 1.5rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.close-expanded:hover,
+.close-expanded-modal:hover {
+  background: rgba(255, 0, 85, 0.2);
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+  box-shadow: 0 0 15px rgba(255, 0, 85, 0.5);
+  transform: rotate(90deg) scale(1.1);
+}
+
+.expanded-assignments {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.expanded-assignment-item {
+  padding: 4px 6px;
+  background: rgba(0, 179, 255, 0.1);
+  border-left: 3px solid var(--accent-blue);
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  flex-shrink: 1;
+  min-height: 0;
+}
+
+.expanded-assignment-item:hover {
+  background: rgba(0, 179, 255, 0.2);
+  transform: translateX(5px);
+  box-shadow: 0 0 10px rgba(0, 179, 255, 0.3);
+}
+
+.expanded-assignment-item.has-due-date {
+  border-left-color: var(--accent-red);
+  background: rgba(255, 0, 85, 0.1);
+}
+
+.expanded-assignment-item.has-due-date:hover {
+  background: rgba(255, 0, 85, 0.2);
+  box-shadow: 0 0 10px rgba(255, 0, 85, 0.3);
+}
+
+/* Expanded modal - Class schedule item styling - Quiz (Orange/Amber) */
+.expanded-assignment-item.class-schedule-quiz {
+  background: rgba(255, 152, 0, 0.15);
+  border-left-color: #ff9800;
+}
+
+.expanded-assignment-item.class-schedule-quiz:hover {
+  background: rgba(255, 152, 0, 0.25);
+  box-shadow: 0 0 10px rgba(255, 152, 0, 0.4);
+}
+
+.expanded-assignment-item.class-schedule-quiz .expanded-assignment-name {
+  color: #ffb74d;
+}
+
+/* Expanded modal - Class schedule item styling - Test (Red) */
+.expanded-assignment-item.class-schedule-test {
+  background: rgba(244, 67, 54, 0.15);
+  border-left-color: #f44336;
+}
+
+.expanded-assignment-item.class-schedule-test:hover {
+  background: rgba(244, 67, 54, 0.25);
+  box-shadow: 0 0 10px rgba(244, 67, 54, 0.4);
+}
+
+.expanded-assignment-item.class-schedule-test .expanded-assignment-name {
+  color: #ef5350;
+}
+
+/* Expanded modal - Class schedule item styling - Final Exam (Purple) */
+.expanded-assignment-item.class-schedule-exam {
+  background: rgba(156, 39, 176, 0.15);
+  border-left-color: #9c27b0;
+}
+
+.expanded-assignment-item.class-schedule-exam:hover {
+  background: rgba(156, 39, 176, 0.25);
+  box-shadow: 0 0 10px rgba(156, 39, 176, 0.4);
+}
+
+.expanded-assignment-item.class-schedule-exam .expanded-assignment-name {
+  color: #ba68c8;
+  font-weight: 700;
+}
+
+/* Expanded modal - Class schedule item styling - Holiday (Gold/Yellow) */
+.expanded-assignment-item.class-schedule-holiday {
+  background: rgba(255, 193, 7, 0.2);
+  border-left-color: #ffc107;
+}
+
+.expanded-assignment-item.class-schedule-holiday:hover {
+  background: rgba(255, 193, 7, 0.3);
+  box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+}
+
+.expanded-assignment-item.class-schedule-holiday .expanded-assignment-name {
+  color: #ffd54f;
+  font-weight: 600;
+}
+
+.expanded-assignment-name {
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--text-main);
+  margin-bottom: 2px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.expanded-assignment-time {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  font-style: italic;
+  line-height: 1.1;
+}
+
+.expanded-assignment-time.due-time {
+  color: var(--accent-red);
+  font-weight: 600;
+}
+
+.expanded-assignment-item.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.expanded-assignment-item.clickable:hover {
+  background: rgba(0, 179, 255, 0.2);
+  transform: translateX(5px);
+}
+
+/* Drag Ghost Preview */
+.drag-ghost {
+  pointer-events: none;
+  filter: drop-shadow(0 4px 12px rgba(0, 179, 255, 0.6));
+}
+
+.drag-ghost .assignment-item {
+  background: rgba(0, 179, 255, 0.9);
+  border: 2px solid var(--accent-blue);
+  box-shadow: 0 0 20px rgba(0, 179, 255, 0.8);
+  padding: 8px 12px;
+  border-radius: 6px;
+  min-width: 150px;
+}
+
+/* FUTURE PLANNING MODAL */
+.future-planning-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fadeIn 0.3s ease;
+}
+
+.future-planning-modal {
+  background: var(--bg-panel);
+  border: 2px solid var(--accent-green);
+  border-radius: 12px;
+  box-shadow: 0 0 30px rgba(76, 175, 80, 0.4);
+  width: 90%;
+}
+
+.future-planning-modal-large {
+  max-width: 600px;
+  width: 90%;
+  animation: zoomIn 0.3s ease;
+}
+
+.future-planning-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 2px solid var(--divider);
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.future-planning-title {
+  font-family: "Orbitron", sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--accent-green);
+  text-shadow: 0 0 10px var(--accent-green);
+  margin: 0;
+}
+
+.close-future-planning {
+  background: transparent;
+  border: 2px solid var(--accent-green);
+  color: var(--accent-green);
+  font-size: 1.5rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.close-future-planning:hover {
+  background: rgba(255, 0, 85, 0.2);
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+  box-shadow: 0 0 15px rgba(255, 0, 85, 0.5);
+  transform: rotate(90deg);
+}
+
+.future-planning-content {
+  padding: 20px;
+}
+
+.future-planning-description {
+  color: var(--text-dim);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.date-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.date-input-group label {
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  color: var(--text-main);
+  font-size: 1rem;
+}
+
+.date-input {
+  padding: 10px;
+  background: rgba(13, 17, 23, 0.5);
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  color: var(--text-main);
+  font-family: "Rajdhani", sans-serif;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.date-input:focus {
+  outline: none;
+  border-color: var(--accent-green);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+}
+
+.schedule-indicator {
+  padding: 8px 12px;
+  background: rgba(76, 175, 80, 0.1);
+  border-left: 3px solid var(--accent-green);
+  border-radius: 4px;
+  color: var(--accent-green);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.future-planning-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.calculate-button {
+  padding: 10px 20px;
+  background: rgba(76, 175, 80, 0.2);
+  border: 2px solid var(--accent-green);
+  border-radius: 6px;
+  color: var(--accent-green);
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.calculate-button:hover {
+  background: rgba(76, 175, 80, 0.3);
+  box-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
+  transform: translateY(-2px);
+}
+
+.cancel-button {
+  padding: 10px 20px;
+  background: rgba(255, 0, 85, 0.1);
+  border: 2px solid var(--accent-red);
+  border-radius: 6px;
+  color: var(--accent-red);
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.cancel-button:hover {
+  background: rgba(255, 0, 85, 0.2);
+  box-shadow: 0 0 15px rgba(255, 0, 85, 0.5);
+  transform: translateY(-2px);
+}
+
+/* CALENDAR VIEW TOGGLE */
+.calendar-view-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 20px;
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid var(--accent-green);
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.toggle-calendar-button {
+  padding: 0.6rem 1.2rem;
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid var(--accent-green);
+  border-radius: 6px;
+  color: var(--accent-green);
+  font-family: "Rajdhani", sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.toggle-calendar-button:hover {
+  background: rgba(76, 175, 80, 0.2);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+  transform: translateY(-2px);
+}
+
+.calendar-view-label {
+  font-family: "Orbitron", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--accent-green);
+  text-shadow: 0 0 10px var(--accent-green);
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .calendar-header {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .header-buttons-left {
+    position: static;
+    width: 100%;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .future-planning-button,
+  .clear-calendar-button {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  .back-button {
+    position: static;
+    width: 100%;
+    margin-top: 10px;
+  }
+
+  .pending-changes-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .pending-changes-text {
+    min-width: auto;
+    text-align: center;
+  }
+
+  .pending-changes-buttons {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .accept-changes-button,
+  .discard-changes-button {
+    flex: 1;
+    max-width: 200px;
+  }
+
+  .calendar-controls {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .month-year {
+    width: 100%;
+    text-align: center;
+    order: -1;
+  }
+
+  .calendar-day {
+    min-height: 70px;
+    height: 70px;
+    max-height: 70px;
+    padding: 4px;
+  }
+
+  .calendar-controls {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .controls-left {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .month-year {
+    position: static;
+    transform: none;
+    width: 100%;
+    text-align: center;
+    order: -1;
+  }
+
+  .assignment-item {
+    font-size: 0.65rem;
+    padding: 3px 4px;
+  }
+
+  .assignment-name {
+    font-size: 0.7rem;
+  }
+
+  .assignment-time {
+    font-size: 0.6rem;
+  }
+
+  .course-sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 2px solid var(--divider);
+  }
+
+  .semester-sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 2px solid var(--divider);
+    left: 0;
+  }
+
+  .semester-buttons-vertical {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 10px;
+  }
+
+  .semester-button-vertical {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .calendar-main-wrapper {
+    margin-left: 0;
+    width: 100%;
+    padding: 10px;
+  }
+}
+

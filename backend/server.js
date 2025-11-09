@@ -7,6 +7,7 @@ const d2lRoutes = require('./routes/d2lRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 const makeupRoutes = require('./routes/makeupRoutes');
 const serverRoutes = require('./routes/serverRoutes');
+const calendarRoutes = require('./routes/calendarRoutes');
 
 const app = express();
 const PORT = process.env.PORT || process.env.BACKEND_PORT || 5000;
@@ -25,6 +26,7 @@ app.use('/api/d2l', d2lRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/makeup', makeupRoutes);
 app.use('/api/server', serverRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 // Error handling middleware
 app.use((error, req, res, next) => {

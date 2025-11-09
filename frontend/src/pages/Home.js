@@ -21,6 +21,10 @@ function Home() {
     navigate('/quiz-grader');
   };
 
+  const handleCalendarClick = () => {
+    navigate('/calendar');
+  };
+
   // Check server status on component mount
   useEffect(() => {
     checkServerStatus();
@@ -107,6 +111,10 @@ function Home() {
             <button className="menu-card purple" onClick={handleQuizGraderClick}>
               <div className="card-title">Quiz Grader</div>
               <div className="card-description">OCR-based quiz grading system</div>
+            </button>
+            <button className="menu-card orange" onClick={handleCalendarClick}>
+              <div className="card-title">Calendar</div>
+              <div className="card-description">View assignments and due dates</div>
             </button>
           </div>
         </section>

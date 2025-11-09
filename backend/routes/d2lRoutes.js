@@ -35,7 +35,7 @@ router.post('/login', (req, res) => {
   try {
     const userDataDir = path.join('C:', 'Users', 'chase', 'Documents', 'Shared-Browser-Data');
     const d2lUrl = 'https://d2l.lonestar.edu/';
-    const pythonScript = path.join('C:', 'Users', 'chase', 'Documents', 'School Scripts', 'D2L-Macro', 'd2l_playwright_processor.py');
+    const pythonScript = path.join('C:', 'Users', 'chase', 'Documents', 'School Scrips', 'D2L-Macro', 'd2l_playwright_processor.py');
 
     console.log('🚀 Launching Chrome for D2L login...');
     exec(
@@ -50,7 +50,7 @@ router.post('/login', (req, res) => {
 
         // 🐍 Launch Python agent silently
         const python = spawn('python', [pythonScript, 'login'], {
-          cwd: path.join('C:', 'Users', 'chase', 'Documents', 'School Scripts', 'D2L-Macro'),
+          cwd: path.join('C:', 'Users', 'chase', 'Documents', 'School Scrips', 'D2L-Macro'),
           stdio: ['pipe', 'pipe', 'pipe'],
           env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
         });
@@ -76,7 +76,7 @@ router.post('/select-class', (req, res) => {
       return res.status(400).json({ success: false, error: 'Missing classCode' });
     }
 
-    const pythonScript = path.join('C:', 'Users', 'chase', 'Documents', 'School Scripts', 'D2L-Macro', 'd2l_playwright_processor.py');
+    const pythonScript = path.join('C:', 'Users', 'chase', 'Documents', 'School Scrips', 'D2L-Macro', 'd2l_playwright_processor.py');
     
     // Verify the Python script exists before trying to spawn it
     if (!fs.existsSync(pythonScript)) {
@@ -92,15 +92,27 @@ router.post('/select-class', (req, res) => {
     // 🔧 Fully detached process (prevents stdout from corrupting response)
     try {
       const python = spawn('python', [pythonScript, 'open-course', classCode], {
-        cwd: path.join('C:', 'Users', 'chase', 'Documents', 'School Scripts', 'D2L-Macro'),
+        cwd: path.join('C:', 'Users', 'chase', 'Documents', 'School Scrips', 'D2L-Macro'),
         detached: true,
-        stdio: 'ignore', // <— Don't attach stdout/stderr to Node
+        stdio: 'ignore', // <— Don't attach stdout/stderr to prevent crashes
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+      });
+
+      // Handle process errors without crashing the server
+      python.on('error', (error) => {
+        console.error('❌ Python process error:', error);
+        // Don't send response here - it may have already been sent
+      });
+
+      python.on('exit', (code, signal) => {
+        if (code !== 0 && code !== null) {
+          console.log(`🐍 Python process exited with code ${code}${signal ? ` (signal: ${signal})` : ''}`);
+        }
       });
 
       python.unref(); // <— let it run completely independent
 
-      // Immediately send clean JSON:
+      // Immediately send clean JSON (don't wait for Python to finish):
       return res.json({ success: true, message: `Opened ${classCode} in persistent browser` });
     } catch (spawnError) {
       console.error('Failed to spawn Python process:', spawnError);
@@ -144,7 +156,7 @@ router.post('/process', (req, res) => {
 
     console.log('▶️ Starting D2L date processing...');
     const python = spawn('python', [cliScript, 'process', classUrl, csvFilePath], {
-      cwd: path.join('C:', 'Users', 'chase', 'Documents', 'School Scripts', 'D2L-Macro'),
+      cwd: path.join('C:', 'Users', 'chase', 'Documents', 'School Scrips', 'D2L-Macro'),
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
     });
@@ -205,7 +217,7 @@ router.post('/process_schedule', (req, res) => {
     }
 
     const cliScript = path.join(
-      'C:\\', 'Users', 'chase', 'Documents', 'School Scripts', 'D2L-Macro', 'd2l_playwright_processor.py'
+      'C:\\', 'Users', 'chase', 'Documents', 'School Scrips', 'D2L-Macro', 'd2l_playwright_processor.py'
     );
 
     console.log('▶️ Starting D2L date processing for', classCode);
