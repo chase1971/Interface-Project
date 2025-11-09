@@ -29,11 +29,15 @@ import {
   getSemesterDateRange,
   normalizeDate,
   parseCsvFile,
+  parseClassScheduleCsv,
   monthNames,
   copyAndShiftTRtoMW,
-  getCourseSchedule
+  getCourseSchedule,
+  normalizeClassScheduleDate
 } from "../utils/calendarUtils";
+import { validateCsvFiles } from "../utils/csvValidation";
 import { cascadeMoveItems } from "../utils/classDayUtils";
+import { debugLog, debugError, debugWarn } from "../utils/debug";
 
 // Config
 import { COURSES } from '../config/courses';
@@ -219,20 +223,21 @@ function Calendar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acceptedFutureAssignments, selectedCourse]);
 
-  // Save selected course to localStorage when it changes
+  // Track if we just imported a calendar to prevent useEffect from clearing it
+  const justImportedRef = useRef(false);
+
+  // Save selected course and calendar mode to localStorage when they change
   useEffect(() => {
     if (selectedCourse) {
       localStorage.setItem('selectedCourse', selectedCourse);
     }
-  }, [selectedCourse]);
-
-  // Track if we just imported a calendar to prevent useEffect from clearing it
-  const justImportedRef = useRef(false);
+    localStorage.setItem('calendarMode', calendarMode);
+  }, [selectedCourse, calendarMode]);
 
   // Load calendar data for the selected course
   useEffect(() => {
     if (selectedCourse && !justImportedRef.current) {
-      loadCourseCalendar(selectedCourse);
+    loadCourseCalendar(selectedCourse);
     }
     // Reset the flag after a short delay to allow normal loading on course switch
     if (justImportedRef.current) {
@@ -286,11 +291,6 @@ function Calendar() {
     };
   }, [pickedUpScheduleItem, calendarMode, isEditMode]);
 
-  // Save calendar mode to localStorage when it changes
-  useEffect(() => {
-    localStorage.setItem('calendarMode', calendarMode);
-  }, [calendarMode]);
-
   // Load class schedule data
   const loadClassSchedule = async () => {
     try {
@@ -313,7 +313,7 @@ function Calendar() {
           setClassSchedule(parsed);
           return;
         } catch (e) {
-          console.error('Error parsing saved class schedule:', e);
+          debugError('Error parsing saved class schedule:', e);
         }
       }
       
@@ -331,11 +331,11 @@ function Calendar() {
       if (result.success) {
         setClassSchedule(result.data);
       } else {
-        console.error('Failed to fetch class schedule:', result.error);
+        debugError('Failed to fetch class schedule:', result.error);
         setClassSchedule([]);
       }
     } catch (error) {
-      console.error('Error loading class schedule:', error);
+      debugError('Error loading class schedule:', error);
       setClassSchedule([]);
     }
   };
@@ -404,31 +404,12 @@ function Calendar() {
     }
   };
 
-  // Handle mouse move for ghost image
-  useEffect(() => {
-    if (!pickedUpScheduleItem || calendarMode !== 'class' || !isEditMode) {
-      return;
-    }
-
-    const handleMouseMove = (e) => {
-      setScheduleItemDragPosition({
-        x: e.clientX,
-        y: e.clientY
-      });
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-    };
-  }, [pickedUpScheduleItem, calendarMode, isEditMode]);
-
   // Handle class schedule item drop (with cascading)
   const handleScheduleItemDrop = (targetDate) => {
-    console.log('handleScheduleItemDrop called', { targetDate, pickedUpScheduleItem, isEditMode, calendarMode });
+    debugLog('handleScheduleItemDrop called', { targetDate, pickedUpScheduleItem, isEditMode, calendarMode });
     
     if (!isEditMode || calendarMode !== 'class' || !pickedUpScheduleItem) {
-      console.log('Early return - conditions not met', { isEditMode, calendarMode, hasPickedUpItem: !!pickedUpScheduleItem });
+      debugLog('Early return - conditions not met', { isEditMode, calendarMode, hasPickedUpItem: !!pickedUpScheduleItem });
       return;
     }
     
@@ -437,11 +418,11 @@ function Calendar() {
     const targetDateStr = targetDateObj.toISOString().split('T')[0];
     const sourceDateStr = pickedUpScheduleItem.sourceDate;
     
-    console.log('Drop attempt', { sourceDateStr, targetDateStr, targetDate });
+    debugLog('Drop attempt', { sourceDateStr, targetDateStr, targetDate });
     
     // Don't do anything if dropping on the same date
     if (targetDateStr === sourceDateStr) {
-      console.log('Dropping on same date - cancelling');
+      debugLog('Dropping on same date - cancelling');
       setPickedUpScheduleItem(null);
       setScheduleItemDragPosition(null);
       return;
@@ -450,13 +431,13 @@ function Calendar() {
     // Get course schedule for cascading
     const courseSchedule = getCourseSchedule(selectedCourse, COURSES);
     if (!courseSchedule) {
-      console.error('Could not determine course schedule for cascading');
+      debugError('Could not determine course schedule for cascading');
       setPickedUpScheduleItem(null);
       setScheduleItemDragPosition(null);
       return;
     }
     
-    console.log('Course schedule:', courseSchedule);
+    debugLog('Course schedule:', courseSchedule);
     
     // Create a working copy of class schedule first
     const updatedSchedule = [...classSchedule]; // Use spread to ensure new array reference
@@ -494,29 +475,29 @@ function Calendar() {
       }
     });
     
-    console.log('Holiday dates set:', Array.from(holidayDates));
+    debugLog('Holiday dates set:', Array.from(holidayDates));
     
-    console.log('Looking for item to move', { sourceDateStr, itemName: pickedUpScheduleItem.itemName, scheduleLength: updatedSchedule.length });
-    console.log('Current schedule items:', updatedSchedule.map(i => ({ date: i.date, description: i.description })));
+    debugLog('Looking for item to move', { sourceDateStr, itemName: pickedUpScheduleItem.itemName, scheduleLength: updatedSchedule.length });
+    debugLog('Current schedule items:', updatedSchedule.map(i => ({ date: i.date, description: i.description })));
     
     // Find the item being moved by matching date and description
     const itemToMove = updatedSchedule.find(item => 
       item.date === sourceDateStr && item.description === pickedUpScheduleItem.itemName
     );
     if (!itemToMove) {
-      console.error('Could not find item to move', { sourceDateStr, itemName: pickedUpScheduleItem.itemName, availableItems: updatedSchedule.map(i => ({ date: i.date, description: i.description })) });
+      debugError('Could not find item to move', { sourceDateStr, itemName: pickedUpScheduleItem.itemName, availableItems: updatedSchedule.map(i => ({ date: i.date, description: i.description })) });
       setPickedUpScheduleItem(null);
       setScheduleItemDragPosition(null);
       return;
     }
     
-    console.log('Found item to move:', itemToMove);
+    debugLog('Found item to move:', itemToMove);
     
     // Check if target date is empty (no item on target date)
     const targetDateItem = updatedSchedule.find(item => item.date === targetDateStr);
     const isTargetEmpty = !targetDateItem;
     
-    console.log('Target date status', { targetDateStr, isTargetEmpty, targetItem: targetDateItem });
+    debugLog('Target date status', { targetDateStr, isTargetEmpty, targetItem: targetDateItem });
     
     // Convert to format expected by cascadeMoveItems
     const scheduleItemsForCascade = updatedSchedule.map(item => {
@@ -549,7 +530,7 @@ function Calendar() {
     
     if (isTargetEmpty) {
       // Target is empty - just move the item, no cascading
-      console.log('Target is empty - simple move, no cascading');
+      debugLog('Target is empty - simple move, no cascading');
       cascadedItems = scheduleItemsForCascade.map(item => {
         if (item.date === sourceDateStr && item.itemName === pickedUpScheduleItem.itemName) {
           return { ...item, date: targetDateStr };
@@ -558,7 +539,7 @@ function Calendar() {
       });
     } else {
       // Target has an item - replace it and cascade
-      console.log('Calling cascadeMoveItems (target occupied)', { 
+      debugLog('Calling cascadeMoveItems (target occupied)', { 
         itemsCount: scheduleItemsForCascade.length, 
         sourceDateStr, 
         targetDateStr, 
@@ -574,11 +555,11 @@ function Calendar() {
       );
     }
     
-    console.log('Cascaded items result', cascadedItems);
-    console.log('Cascaded items count:', cascadedItems.length);
+    debugLog('Cascaded items result', cascadedItems);
+    debugLog('Cascaded items count:', cascadedItems.length);
     
     if (!cascadedItems || cascadedItems.length === 0) {
-      console.error('Cascade function returned no items!');
+      debugError('Cascade function returned no items!');
       setPickedUpScheduleItem(null);
       setScheduleItemDragPosition(null);
       return;
@@ -594,7 +575,7 @@ function Calendar() {
       }
     });
     
-    console.log('Cascaded map created with', cascadedMap.size, 'items');
+    debugLog('Cascaded map created with', cascadedMap.size, 'items');
     
     const newClassSchedule = updatedSchedule.map(item => {
       // Find the cascaded item that matches this description
@@ -605,7 +586,7 @@ function Calendar() {
         // Always update the date from cascaded item
         const newDate = cascadedItem.date;
         if (newDate !== item.date) {
-          console.log('Updating item date', { 
+          debugLog('Updating item date', { 
             oldDate: item.date, 
             newDate: newDate, 
             description: item.description 
@@ -614,12 +595,12 @@ function Calendar() {
         return { ...item, date: newDate };
       }
       // If not found in cascaded items, keep original
-      console.warn('Item not found in cascaded items, keeping original date', item.description);
+      debugWarn('Item not found in cascaded items, keeping original date', item.description);
       return item;
     });
     
-    console.log('New class schedule (first 5 items):', newClassSchedule.slice(0, 5));
-    console.log('Total items in new schedule:', newClassSchedule.length);
+    debugLog('New class schedule (first 5 items):', newClassSchedule.slice(0, 5));
+    debugLog('Total items in new schedule:', newClassSchedule.length);
     
     // Force a state update with a new array reference
     setClassSchedule([...newClassSchedule]);
@@ -631,7 +612,7 @@ function Calendar() {
     setPickedUpScheduleItem(null);
     setScheduleItemDragPosition(null);
     
-    console.log('Drop completed successfully - state updated');
+    debugLog('Drop completed successfully - state updated');
   };
 
   // Load calendar data for a specific course
@@ -652,20 +633,20 @@ function Calendar() {
         setAssignments(originals);
         setAcceptedFutureAssignments(accepted);
         setManualAdjustments(adjustments);
-      } else {
+        } else {
         // NO calendar - clear everything
+          setOriginalAssignments([]);
+          setAssignments([]);
+          setAcceptedFutureAssignments([]);
+          setManualAdjustments({});
+        }
+    } catch (error) {
+      debugError('Error loading course calendar:', error);
+      // On error, clear everything
         setOriginalAssignments([]);
         setAssignments([]);
         setAcceptedFutureAssignments([]);
         setManualAdjustments({});
-      }
-    } catch (error) {
-      console.error('Error loading course calendar:', error);
-      // On error, clear everything
-      setOriginalAssignments([]);
-      setAssignments([]);
-      setAcceptedFutureAssignments([]);
-      setManualAdjustments({});
     } finally {
       setLoading(false);
     }
@@ -714,303 +695,161 @@ function Calendar() {
       
       // No alert - just close the modal
     } catch (error) {
-      console.error('Error importing calendar:', error);
+      debugError('Error importing calendar:', error);
       alert('Error importing calendar: ' + error.message);
     }
   };
 
-  // Handle importing from default calendar
-  const handleImportDefaultCalendar = (defaultCalendarId) => {
-    console.log('═══════════════════════════════════════════════════════════');
-    console.log('🟢 STEP 2: handleImportDefaultCalendar CALLED');
-    console.log('═══════════════════════════════════════════════════════════');
-    console.log('Default calendar ID:', defaultCalendarId);
-    console.log('Importing into course:', importingCourse);
-    console.log('Timestamp:', new Date().toISOString());
-    
-    if (!defaultCalendarId || !importingCourse) {
-      console.error('❌ Missing parameters - cannot import');
+  // Validate default calendar and parameters
+  const validateDefaultCalendarImport = (defaultCalendarId, courseId) => {
+    if (!defaultCalendarId || !courseId) {
+      debugError('❌ Missing parameters - cannot import');
       alert('Please select a default calendar.');
+      return null;
+    }
+
+    const defaultCal = getDefaultCalendar(defaultCalendarId);
+    debugLog('🔍 Looking up default calendar in localStorage...');
+    debugLog('Default calendar found:', {
+      exists: !!defaultCal,
+      hasAssignments: !!defaultCal?.assignments,
+      assignmentCount: defaultCal?.assignments?.length || 0,
+      hasClassSchedule: !!defaultCal?.classSchedule,
+      classScheduleCount: defaultCal?.classSchedule?.length || 0
+    });
+    
+    if (!defaultCal || !defaultCal.assignments) {
+      debugError('❌ Default calendar not found or has no assignments');
+      alert('Default calendar not found or has no assignments.');
+      return null;
+    }
+
+    return defaultCal;
+  };
+
+  // Copy data from default calendar
+  const copyDefaultCalendarData = (defaultCal) => {
+    debugLog('═══════════════════════════════════════════════════════════');
+    debugLog('🟢 STEP 3: COPYING DATA FROM DEFAULT CALENDAR');
+    debugLog('═══════════════════════════════════════════════════════════');
+    
+    const importedAssignments = JSON.parse(JSON.stringify(defaultCal.assignments));
+    const importedClassSchedule = defaultCal.classSchedule 
+      ? JSON.parse(JSON.stringify(defaultCal.classSchedule))
+      : [];
+    
+    debugLog(`📋 Copied ${importedAssignments.length} assignments`);
+    debugLog(`📅 Copied ${importedClassSchedule.length} class schedule items`);
+    
+    // Log first items for debugging
+    if (importedAssignments.length > 0) {
+      debugLog('📝 FIRST ASSIGNMENT:', importedAssignments[0].itemName);
+    }
+    if (importedClassSchedule.length > 0) {
+      debugLog('📚 FIRST CLASS SCHEDULE ITEM:', importedClassSchedule[0].description);
+    }
+
+    return { importedAssignments, importedClassSchedule };
+  };
+
+  // Save imported calendar to localStorage
+  const saveImportedCalendar = (courseId, assignments, classSchedule) => {
+    debugLog('═══════════════════════════════════════════════════════════');
+    debugLog('🟢 STEP 4: SAVING TO COURSE CALENDAR');
+    debugLog('═══════════════════════════════════════════════════════════');
+    
+    // Save assignments to course calendars
+    setCourseCalendar(courseId, {
+      originalAssignments: assignments,
+      acceptedFutureAssignments: [],
+      manualAdjustments: {}
+    });
+    debugLog(`✅ Saved ${assignments.length} assignments to courseCalendars['${courseId}']`);
+
+    // Normalize and save class schedule
+    const normalizedClassSchedule = classSchedule.map(item => ({
+      ...item,
+      date: normalizeClassScheduleDate(item.date)
+    }));
+    
+    const scheduleKey = `classSchedule_${courseId}`;
+    localStorage.setItem(scheduleKey, JSON.stringify(normalizedClassSchedule));
+    debugLog(`✅ Saved ${normalizedClassSchedule.length} class schedule items to localStorage['${scheduleKey}']`);
+
+    return normalizedClassSchedule;
+  };
+
+  // Load imported calendar into component state if course matches
+  const loadImportedCalendarIntoState = (courseId, assignments, normalizedClassSchedule) => {
+    debugLog('═══════════════════════════════════════════════════════════');
+    debugLog('🟢 STEP 5: LOADING INTO FRONTEND COMPONENT STATE');
+    debugLog('═══════════════════════════════════════════════════════════');
+    debugLog('Importing course:', courseId);
+    debugLog('Selected course:', selectedCourse);
+    debugLog('Courses match:', courseId === selectedCourse);
+    
+    if (courseId !== selectedCourse) {
+      debugLog('⚠️ Courses do not match - data saved but not loaded into view');
       return;
     }
 
+    debugLog('✅ Courses match - loading into component state immediately');
+    
+    // Set flag to prevent useEffect from clearing imported data
+    justImportedRef.current = true;
+    
+    // Load into component state
+    setOriginalAssignments(assignments);
+    setAssignments(assignments);
+    setAcceptedFutureAssignments([]);
+    setManualAdjustments({});
+    setClassSchedule(normalizedClassSchedule);
+    
+    debugLog(`✅ Loaded ${assignments.length} assignments and ${normalizedClassSchedule.length} class schedule items into state`);
+  };
+
+  // Handle importing from default calendar
+  const handleImportDefaultCalendar = (defaultCalendarId) => {
+    debugLog('═══════════════════════════════════════════════════════════');
+    debugLog('🟢 STEP 2: handleImportDefaultCalendar CALLED');
+    debugLog('═══════════════════════════════════════════════════════════');
+    debugLog('Default calendar ID:', defaultCalendarId);
+    debugLog('Importing into course:', importingCourse);
+    debugLog('Timestamp:', new Date().toISOString());
+
     try {
-      console.log('🔍 Looking up default calendar in localStorage...');
-      const defaultCal = getDefaultCalendar(defaultCalendarId);
-      console.log('Default calendar found:', {
-        exists: !!defaultCal,
-        hasAssignments: !!defaultCal?.assignments,
-        assignmentCount: defaultCal?.assignments?.length || 0,
-        hasClassSchedule: !!defaultCal?.classSchedule,
-        classScheduleCount: defaultCal?.classSchedule?.length || 0
-      });
-      
-      if (!defaultCal || !defaultCal.assignments) {
-        console.error('❌ Default calendar not found or has no assignments');
-        alert('Default calendar not found or has no assignments.');
-        return;
-      }
+      // Step 1: Validate
+      const defaultCal = validateDefaultCalendarImport(defaultCalendarId, importingCourse);
+      if (!defaultCal) return;
 
-      console.log('═══════════════════════════════════════════════════════════');
-      console.log('🟢 STEP 3: COPYING DATA FROM DEFAULT CALENDAR');
-      console.log('═══════════════════════════════════════════════════════════');
-      
-      // Copy assignments from default calendar
-      const importedAssignments = JSON.parse(JSON.stringify(defaultCal.assignments));
-      console.log(`📋 Copied ${importedAssignments.length} assignments`);
-      
-      // Copy class schedule from default calendar
-      const importedClassSchedule = defaultCal.classSchedule 
-        ? JSON.parse(JSON.stringify(defaultCal.classSchedule))
-        : [];
-      console.log(`📅 Copied ${importedClassSchedule.length} class schedule items`);
-      
-      // Show first items from each
-      if (importedAssignments.length > 0) {
-        console.log('📝 FIRST ASSIGNMENT (from Assignment Calendar CSV):');
-        console.log(JSON.stringify(importedAssignments[0], null, 2));
-        console.log('  - itemName:', importedAssignments[0].itemName);
-        console.log('  - startDate:', importedAssignments[0].startDate, '→ parsed:', parseDate(importedAssignments[0].startDate));
-        console.log('  - dueDate:', importedAssignments[0].dueDate, '→ parsed:', parseDate(importedAssignments[0].dueDate));
-        console.log('  - startTime:', importedAssignments[0].startTime);
-        console.log('  - dueTime:', importedAssignments[0].dueTime);
-      }
-      
-      if (importedClassSchedule.length > 0) {
-        console.log('📚 FIRST CLASS SCHEDULE ITEM (from Class Calendar CSV):');
-        console.log(JSON.stringify(importedClassSchedule[0], null, 2));
-        console.log('  - date:', importedClassSchedule[0].date);
-        console.log('  - description:', importedClassSchedule[0].description);
-        console.log('  - type:', importedClassSchedule[0].type);
-      }
+      // Step 2: Copy data
+      const { importedAssignments, importedClassSchedule } = copyDefaultCalendarData(defaultCal);
 
-      console.log('═══════════════════════════════════════════════════════════');
-      console.log('🟢 STEP 4: SAVING TO COURSE CALENDAR');
-      console.log('═══════════════════════════════════════════════════════════');
-      
-      // Save to course calendars
-      setCourseCalendar(importingCourse, {
-        originalAssignments: importedAssignments,
-        acceptedFutureAssignments: [],
-        manualAdjustments: {}
-      });
-      console.log(`✅ Saved ${importedAssignments.length} assignments to courseCalendars['${importingCourse}']`);
+      // Step 3: Save to localStorage
+      const normalizedClassSchedule = saveImportedCalendar(
+        importingCourse,
+        importedAssignments,
+        importedClassSchedule
+      );
 
-      // Normalize class schedule dates to ISO format before saving
-      const normalizedClassSchedule = importedClassSchedule.map(item => {
-        let dateStr = item.date;
-        // Ensure date is in ISO format (YYYY-MM-DD)
-        if (dateStr && dateStr.includes('-') && dateStr.split('-').length === 3) {
-          const parts = dateStr.split('-');
-          // Check if it's MM-DD-YYYY (first part is month, 1-2 digits, last part is 4-digit year)
-          if (parts[0].length <= 2 && parts[1].length <= 2 && parts[2].length === 4) {
-            // It's MM-DD-YYYY, convert to YYYY-MM-DD
-            const [month, day, year] = parts;
-            dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-          }
-          // If it's already YYYY-MM-DD (first part is 4 digits), leave it as is
-        }
-        return {
-          ...item,
-          date: dateStr
-        };
-      });
-      
-      // Save class schedule to localStorage (ALWAYS save it, even if empty)
-      const scheduleKey = `classSchedule_${importingCourse}`;
-      localStorage.setItem(scheduleKey, JSON.stringify(normalizedClassSchedule));
-      console.log(`✅ Saved ${normalizedClassSchedule.length} class schedule items to localStorage['${scheduleKey}']`);
+      // Step 4: Load into state if course matches
+      loadImportedCalendarIntoState(importingCourse, importedAssignments, normalizedClassSchedule);
 
-      // If this is the currently selected course, load it immediately
-      console.log('═══════════════════════════════════════════════════════════');
-      console.log('🟢 STEP 5: LOADING INTO FRONTEND COMPONENT STATE');
-      console.log('═══════════════════════════════════════════════════════════');
-      console.log('Importing course:', importingCourse);
-      console.log('Selected course:', selectedCourse);
-      console.log('Courses match:', importingCourse === selectedCourse);
-      
-      if (importingCourse === selectedCourse) {
-        console.log('✅ Courses match - loading into component state immediately');
-        
-        // Set flag to prevent useEffect from clearing our imported data
-        justImportedRef.current = true;
-        console.log('✅ Set justImportedRef flag to prevent useEffect from clearing data');
-        
-        // Use already normalized class schedule (dates already converted to ISO above)
-        console.log(`✅ Using normalized class schedule with ${normalizedClassSchedule.length} items (dates in ISO format)`);
-        
-        console.log('🔄 Setting component state...');
-        setOriginalAssignments(importedAssignments);
-        console.log(`  ✅ setOriginalAssignments(${importedAssignments.length} items)`);
-        
-        setAssignments(importedAssignments);
-        console.log(`  ✅ setAssignments(${importedAssignments.length} items)`);
-        
-        setAcceptedFutureAssignments([]);
-        console.log(`  ✅ setAcceptedFutureAssignments([])`);
-        
-        setManualAdjustments({});
-        console.log(`  ✅ setManualAdjustments({})`);
-        
-        setClassSchedule(normalizedClassSchedule);
-        console.log(`  ✅ setClassSchedule(${normalizedClassSchedule.length} items)`);
-        
-        console.log('═══════════════════════════════════════════════════════════');
-        console.log('🟢 STEP 6: VERIFYING STATE AFTER SET');
-        console.log('═══════════════════════════════════════════════════════════');
-        
-        // Check state after React has had time to update
-        setTimeout(() => {
-          console.log('📊 STATE VERIFICATION (after React update):');
-          console.log('  originalAssignments.length:', originalAssignments?.length || 0);
-          console.log('  assignments.length:', assignments?.length || 0);
-          console.log('  classSchedule.length:', classSchedule?.length || 0);
-          console.log('  acceptedFutureAssignments.length:', acceptedFutureAssignments?.length || 0);
-          console.log('  manualAdjustments keys:', Object.keys(manualAdjustments || {}).length);
-          console.log('  calendarMode:', calendarMode);
-          console.log('  selectedCourse:', selectedCourse);
-          
-          // Check if data is actually there
-          if (originalAssignments && originalAssignments.length > 0) {
-            console.log('  ✅ originalAssignments has data');
-            console.log('  First assignment in state:', JSON.stringify(originalAssignments[0], null, 2));
-          } else {
-            console.error('  ❌ originalAssignments is empty or missing!');
-          }
-          
-          if (classSchedule && classSchedule.length > 0) {
-            console.log('  ✅ classSchedule has data');
-            console.log('  First class schedule item in state:', JSON.stringify(classSchedule[0], null, 2));
-          } else {
-            console.error('  ❌ classSchedule is empty or missing!');
-          }
-          
-          // Test date parsing
-          if (originalAssignments && originalAssignments.length > 0) {
-            const testAssignment = originalAssignments[0];
-            const parsedStart = parseDate(testAssignment.startDate);
-            const parsedDue = parseDate(testAssignment.dueDate);
-            console.log('  Date parsing test:');
-            console.log(`    startDate: "${testAssignment.startDate}" → ${parsedStart ? parsedStart.toISOString() : 'NULL'}`);
-            console.log(`    dueDate: "${testAssignment.dueDate}" → ${parsedDue ? parsedDue.toISOString() : 'NULL'}`);
-            
-            if (!parsedStart && !parsedDue) {
-              console.error('  ❌ ERROR: Dates are not parsing correctly!');
-            }
-          }
-          
-          console.log('═══════════════════════════════════════════════════════════');
-          console.log('🟢 STEP 7: CALENDAR SHOULD NOW BE DISPLAYING');
-          console.log('═══════════════════════════════════════════════════════════');
-          console.log('If calendar is blank, check:');
-          console.log('  1. Are dates parsing correctly? (see above)');
-          console.log('  2. Is calendarMode correct? (assignment vs class)');
-          console.log('  3. Is getAssignmentsForDate finding matches?');
-          console.log('  4. Is CalendarGrid receiving the data?');
-          console.log('═══════════════════════════════════════════════════════════');
-        }, 300);
-      } else {
-        console.log('⚠️ Courses do not match - data saved but not loaded into view');
-        console.log('  User needs to select', importingCourse, 'to see the calendar');
-      }
-
-      // Close modal and reset
+      // Step 5: Close modal
       setShowImportCalendar(false);
       setImportingCourse('');
       
-      // No need to reload - we've already set all the state directly above
-      // The useEffect hooks will handle any necessary updates
-      
-      console.log('═══════════════════════════════════════════════════════════');
-      console.log('🟢 STEP 8: IMPORT COMPLETE - MODAL CLOSING');
-      console.log('═══════════════════════════════════════════════════════════');
-      console.log('Modal closed, import process finished');
-      console.log('═══════════════════════════════════════════════════════════');
-      
-      // No alert - just close the modal
+      debugLog('═══════════════════════════════════════════════════════════');
+      debugLog('🟢 STEP 8: IMPORT COMPLETE - MODAL CLOSING');
+      debugLog('═══════════════════════════════════════════════════════════');
     } catch (error) {
-      console.error('═══════════════════════════════════════════════════════════');
-      console.error('❌ ERROR DURING IMPORT');
-      console.error('═══════════════════════════════════════════════════════════');
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
-      console.error('Error name:', error.name);
-      console.error('Full error object:', error);
-      console.error('═══════════════════════════════════════════════════════════');
+      debugError('═══════════════════════════════════════════════════════════');
+      debugError('❌ ERROR DURING IMPORT');
+      debugError('═══════════════════════════════════════════════════════════');
+      debugError('Error:', error.message);
+      debugError('═══════════════════════════════════════════════════════════');
       alert('Error importing default calendar: ' + error.message);
     }
-  };
-
-  // Parse class schedule CSV (Date,Description format)
-  const parseClassScheduleCsv = (csvContent) => {
-    const lines = csvContent.split('\n').filter(line => line.trim());
-    if (lines.length < 2) {
-      return [];
-    }
-
-    const headers = lines[0].split(',').map(h => h.trim());
-    const data = [];
-
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      // Handle quoted fields
-      const values = [];
-      let current = '';
-      let inQuotes = false;
-      
-      for (let j = 0; j < line.length; j++) {
-        const char = line[j];
-        if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          values.push(current.trim());
-          current = '';
-        } else {
-          current += char;
-        }
-      }
-      values.push(current.trim());
-
-      if (values.length >= 2) {
-        // Parse date from format like "25-Aug-25" to ISO format "YYYY-MM-DD"
-        const dateStr = values[0] || '';
-        let formattedDate = dateStr;
-        
-        // Try to parse date in format "DD-MMM-YY" or "DD-MMM-YYYY"
-        const dateMatch = dateStr.match(/(\d+)-([A-Za-z]+)-(\d+)/);
-        if (dateMatch) {
-          const day = dateMatch[1].padStart(2, '0');
-          const monthName = dateMatch[2];
-          const year = dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3];
-          
-          const monthMap = {
-            'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
-            'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
-            'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
-          };
-          
-          const month = monthMap[monthName] || '01';
-          // Convert to ISO format (YYYY-MM-DD) for consistent date comparison
-          formattedDate = `${year}-${month}-${day}`;
-        } else {
-          // If already in MM-DD-YYYY format, convert to ISO
-          if (dateStr.includes('-') && dateStr.split('-').length === 3) {
-            const [month, day, year] = dateStr.split('-');
-            formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-          }
-        }
-
-        const item = {
-          date: formattedDate,
-          description: values[1] || ''
-        };
-        data.push(item);
-      }
-    }
-
-    return data;
   };
 
   // Initialize default calendar - load from CSV files
@@ -1045,84 +884,38 @@ function Calendar() {
       })
     ])
       .then(([assignmentCsv, classScheduleCsv]) => {
-        console.log('═══════════════════════════════════════════════════════════');
-        console.log('🟢 LOADING DEFAULT CALENDAR FROM CSV FILES');
-        console.log('═══════════════════════════════════════════════════════════');
-        console.log('Assignment CSV first 3 lines:');
-        console.log(assignmentCsv.split('\n').slice(0, 3).join('\n'));
-        console.log('Class Schedule CSV first 3 lines:');
-        console.log(classScheduleCsv.split('\n').slice(0, 3).join('\n'));
+        debugLog('═══════════════════════════════════════════════════════════');
+        debugLog('🟢 LOADING DEFAULT CALENDAR FROM CSV FILES');
+        debugLog('═══════════════════════════════════════════════════════════');
+        debugLog('Assignment CSV first 3 lines:');
+        debugLog(assignmentCsv.split('\n').slice(0, 3).join('\n'));
+        debugLog('Class Schedule CSV first 3 lines:');
+        debugLog(classScheduleCsv.split('\n').slice(0, 3).join('\n'));
         
-        // Verify Assignment CSV has correct headers
-        const assignmentHeader = assignmentCsv.split('\n')[0].trim();
-        if (!assignmentHeader.includes('Item Name') || !assignmentHeader.includes('Start Date')) {
-          console.error('❌ ERROR: Assignment CSV has wrong format!');
-          console.error('Expected: Item Name, Start Date, Start Time, Due Date, Due Time');
-          console.error('Got:', assignmentHeader);
-          throw new Error('Assignment CSV has incorrect format');
-        }
-        
-        // Verify Class Schedule CSV has correct headers
-        const classScheduleHeader = classScheduleCsv.split('\n')[0].trim();
-        if (!classScheduleHeader.includes('Date') || !classScheduleHeader.includes('Description')) {
-          console.error('❌ ERROR: Class Schedule CSV has wrong format!');
-          console.error('Expected: Date, Description');
-          console.error('Got:', classScheduleHeader);
-          throw new Error('Class Schedule CSV has incorrect format');
-        }
-        
-        // Parse assignment calendar CSV (Item Name, Start Date, Start Time, Due Date, Due Time)
+        // Parse CSV files
         const assignments = parseCsvFile(assignmentCsv);
-        console.log(`✅ Parsed ${assignments.length} assignments from Assignment CSV`);
-        if (assignments.length > 0) {
-          console.log('First assignment:', assignments[0]);
-          // Verify it's actually an assignment (should have itemName like "First Assignment")
-          if (assignments[0].itemName && assignments[0].itemName.includes('Introduction')) {
-            console.error('❌ ERROR: Assignment CSV contains class schedule data!');
-            console.error('First item should be "First Assignment" but got:', assignments[0].itemName);
-            console.error('Check that CA-MW-Fall-Assignment-Calendar.csv contains assignment data');
-            throw new Error('Assignment CSV file contains class schedule data instead of assignments');
-          }
-          console.log('✅ Verified: Assignment CSV loaded correctly');
+        const classScheduleItems = parseClassScheduleCsv(classScheduleCsv);
+        
+        debugLog(`✅ Parsed ${assignments.length} assignments from Assignment CSV`);
+        debugLog(`✅ Parsed ${classScheduleItems.length} class schedule items from Class Schedule CSV`);
+        
+        // Validate CSV files and parsed data
+        const validation = validateCsvFiles(assignmentCsv, classScheduleCsv, assignments, classScheduleItems);
+        if (!validation.valid) {
+          debugError('❌ CSV VALIDATION FAILED:');
+          validation.errors.forEach(error => debugError(`  ${error}`));
+          throw new Error(validation.errors.join('; '));
         }
         
-        // Parse class schedule CSV (Date, Description)
-        const classScheduleItems = parseClassScheduleCsv(classScheduleCsv);
-        console.log(`✅ Parsed ${classScheduleItems.length} class schedule items from Class Schedule CSV`);
-        if (classScheduleItems.length > 0) {
-          console.log('First class schedule item:', classScheduleItems[0]);
-          // Verify it's actually a class schedule item (should have description like "Introduction, 1.1")
-          if (classScheduleItems[0].description && classScheduleItems[0].description.includes('First Assignment')) {
-            console.error('❌ ERROR: Class Schedule CSV contains assignment data!');
-            console.error('First item should be "Introduction, 1.1" but got:', classScheduleItems[0].description);
-            console.error('Check that CA-MW-Fall-Class-Calendar.csv contains class schedule data');
-            throw new Error('Class Schedule CSV file contains assignment data instead of class schedule');
-          }
-          console.log('✅ Verified: Class Schedule CSV loaded correctly');
-        }
+        debugLog('✅ All CSV files validated successfully');
         
         // Convert class schedule to the format expected by the app
         // Ensure dates are in ISO format (YYYY-MM-DD) for proper comparison
-        const classSchedule = classScheduleItems.map(item => {
-          let dateStr = item.date;
-          // parseClassScheduleCsv should already convert to ISO, but double-check
-          // If date is in MM-DD-YYYY format (first part is 1-2 digits), convert to ISO (YYYY-MM-DD)
-          if (dateStr && dateStr.includes('-') && dateStr.split('-').length === 3) {
-            const parts = dateStr.split('-');
-            // Check if it's MM-DD-YYYY (first part is month, 1-2 digits)
-            if (parts[0].length <= 2 && parts[1].length <= 2 && parts[2].length === 4) {
-              // It's MM-DD-YYYY, convert to YYYY-MM-DD
-              const [month, day, year] = parts;
-              dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-            }
-            // If it's already YYYY-MM-DD (first part is 4 digits), leave it as is
-          }
-          return {
-            date: dateStr,
-            description: item.description,
-            type: 'classSchedule'
-          };
-        });
+        const classSchedule = classScheduleItems.map(item => ({
+          date: normalizeClassScheduleDate(item.date),
+          description: item.description,
+          type: 'classSchedule'
+        }));
 
         addDefaultCalendar({
           id: 'default-college-algebra-mw-fall',
@@ -1137,7 +930,7 @@ function Calendar() {
         localStorage.setItem('defaultCalendarsInitialized', 'true');
       })
       .catch(err => {
-        console.error('❌ Failed to load CSV files for default calendar:', err);
+        debugError('❌ Failed to load CSV files for default calendar:', err);
         // Fallback: try loading from API
         fetch('/api/calendar/class-schedule')
           .then(response => response.json())
@@ -1167,11 +960,11 @@ function Calendar() {
               });
 
               localStorage.setItem('defaultCalendarsInitialized', 'true');
-              console.log('✓ Initialized default calendar from API with', assignments.length, 'assignments');
+              debugLog('✓ Initialized default calendar from API with', assignments.length, 'assignments');
             }
           })
           .catch(apiErr => {
-            console.error('❌ Failed to load from API as fallback:', apiErr);
+            debugError('❌ Failed to load from API as fallback:', apiErr);
           });
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1314,7 +1107,7 @@ function Calendar() {
         currentClassSchedule = classSchedule;
       }
     } catch (e) {
-      console.error('Error reading class schedule from localStorage:', e);
+      debugError('Error reading class schedule from localStorage:', e);
       currentClassSchedule = classSchedule;
     }
     
@@ -1535,10 +1328,10 @@ function Calendar() {
               <button className="clear-calendar-button" onClick={(e) => {
                 e.stopPropagation();
                 setShowClearCalendarMenu(!showClearCalendarMenu);
-                setSelectedSemester('');
-              }}>
-                Clear Calendar
-              </button>
+              setSelectedSemester('');
+            }}>
+              Clear Calendar
+            </button>
               {showClearCalendarMenu && (
                 <ClearCalendarModal
                   show={showClearCalendarMenu}

@@ -46,6 +46,95 @@ export const parseDate = (dateStr) => {
   return null;
 };
 
+// Normalize class schedule date to ISO format (YYYY-MM-DD)
+// Handles MM-DD-YYYY, DD-MMM-YY, and other formats
+export const normalizeClassScheduleDate = (dateStr) => {
+  if (!dateStr) return dateStr;
+  
+  // If date is in MM-DD-YYYY format (first part is 1-2 digits), convert to ISO (YYYY-MM-DD)
+  if (dateStr.includes('-') && dateStr.split('-').length === 3) {
+    const parts = dateStr.split('-');
+    // Check if it's MM-DD-YYYY (first part is month, 1-2 digits, last part is 4-digit year)
+    if (parts[0].length <= 2 && parts[1].length <= 2 && parts[2].length === 4) {
+      // It's MM-DD-YYYY, convert to YYYY-MM-DD
+      const [month, day, year] = parts;
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+    // If it's already YYYY-MM-DD (first part is 4 digits), leave it as is
+  }
+  
+  return dateStr;
+};
+
+// Parse class schedule CSV (Date,Description format)
+export const parseClassScheduleCsv = (csvContent) => {
+  const lines = csvContent.split('\n').filter(line => line.trim());
+  if (lines.length < 2) {
+    return [];
+  }
+
+  const headers = lines[0].split(',').map(h => h.trim());
+  const data = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // Handle quoted fields
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let j = 0; j < line.length; j++) {
+      const char = line[j];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        values.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.trim());
+
+    if (values.length >= 2) {
+      // Parse date from format like "25-Aug-25" to ISO format "YYYY-MM-DD"
+      const dateStr = values[0] || '';
+      let formattedDate = dateStr;
+      
+      // Try to parse date in format "DD-MMM-YY" or "DD-MMM-YYYY"
+      const dateMatch = dateStr.match(/(\d+)-([A-Za-z]+)-(\d+)/);
+      if (dateMatch) {
+        const day = dateMatch[1].padStart(2, '0');
+        const monthName = dateMatch[2];
+        const year = dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3];
+        
+        const monthMap = {
+          'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+          'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+          'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+        };
+        
+        const month = monthMap[monthName] || '01';
+        // Convert to ISO format (YYYY-MM-DD) for consistent date comparison
+        formattedDate = `${year}-${month}-${day}`;
+      } else {
+        // If already in MM-DD-YYYY format, convert to ISO using utility
+        formattedDate = normalizeClassScheduleDate(dateStr);
+      }
+
+      const item = {
+        date: formattedDate,
+        description: values[1] || ''
+      };
+      data.push(item);
+    }
+  }
+
+  return data;
+};
+
 // Format date to MM-DD-YYYY string
 export const formatDate = (date) => {
   if (!date) return '';

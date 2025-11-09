@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './DebugOverlay.css';
+import { getDebugMode, toggleDebugMode } from '../../utils/debug';
 
 const DebugOverlay = () => {
   const [logs, setLogs] = useState([]);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
+  const [debugEnabled, setDebugEnabled] = useState(() => getDebugMode());
   const [position, setPosition] = useState({ x: 20, y: 20 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -32,6 +34,9 @@ const DebugOverlay = () => {
     };
 
     const addLog = (type, message) => {
+      // Only add logs if debug mode is enabled
+      if (!getDebugMode()) return;
+      
       logQueue.push({
         type,
         message,
@@ -173,6 +178,15 @@ const DebugOverlay = () => {
     alert('Logs copied to clipboard!');
   };
 
+  const handleToggleDebug = () => {
+    const newState = toggleDebugMode();
+    setDebugEnabled(newState);
+    // Clear logs when disabling
+    if (!newState) {
+      setLogs([]);
+    }
+  };
+
   if (!isVisible) return null;
 
   return (
@@ -190,8 +204,18 @@ const DebugOverlay = () => {
         className="debug-overlay-header"
         onMouseDown={handleMouseDown}
       >
-        <span>Debug Logs ({logs.length})</span>
+        <span>Debug Logs ({logs.length}) {debugEnabled ? '🟢' : '🔴'}</span>
         <div className="debug-overlay-controls">
+          <button 
+            onClick={handleToggleDebug} 
+            title={debugEnabled ? "Disable debug mode" : "Enable debug mode"}
+            style={{ 
+              background: debugEnabled ? '#0a5' : '#555',
+              fontWeight: 'bold'
+            }}
+          >
+            {debugEnabled ? 'ON' : 'OFF'}
+          </button>
           <button onClick={copyLogs} title="Copy logs">📋</button>
           <button onClick={clearLogs} title="Clear logs">🗑️</button>
           <button onClick={() => setIsMinimized(!isMinimized)} title="Minimize">
