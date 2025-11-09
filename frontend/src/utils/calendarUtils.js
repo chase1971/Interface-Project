@@ -1,10 +1,49 @@
 // Calendar utility functions
 
-// Parse date string (MM-DD-YYYY) to Date object
+// Parse date string (MM-DD-YYYY, M/D/YYYY, or YYYY-MM-DD ISO format) to Date object
 export const parseDate = (dateStr) => {
   if (!dateStr) return null;
-  const [month, day, year] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
+  
+  // Check for ISO format (YYYY-MM-DD) first - first part is 4 digits
+  if (dateStr.includes('-')) {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const firstPart = parts[0];
+      // If first part is 4 digits, it's ISO format (YYYY-MM-DD)
+      if (firstPart.length === 4 && /^\d{4}$/.test(firstPart)) {
+        const [year, month, day] = parts.map(Number);
+        if (year && month && day) {
+          return new Date(year, month - 1, day);
+        }
+      } else {
+        // Otherwise it's MM-DD-YYYY format
+        const [month, day, year] = parts.map(Number);
+        if (month && day && year) {
+          return new Date(year, month - 1, day);
+        }
+      }
+    }
+  }
+  
+  // Try M/D/YYYY format (with slashes)
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const [month, day, year] = parts.map(Number);
+      if (month && day && year) {
+        return new Date(year, month - 1, day);
+      }
+    }
+  }
+  
+  // Try to parse as ISO date string (fallback)
+  const isoDate = new Date(dateStr);
+  if (!isNaN(isoDate.getTime())) {
+    return isoDate;
+  }
+  
+  console.warn('Could not parse date:', dateStr);
+  return null;
 };
 
 // Format date to MM-DD-YYYY string

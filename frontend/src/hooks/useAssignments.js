@@ -51,12 +51,25 @@ export const useAssignments = ({
 
   // Get assignments for a specific date
   const getAssignmentsForDate = (date) => {
-    if (!date) return [];
+    if (!date) {
+      console.warn('getAssignmentsForDate called with null/undefined date');
+      return [];
+    }
     
     // If in class calendar mode, return class schedule items for this date
     if (calendarMode === 'class') {
       const dateStr = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
       const scheduleItems = classSchedule.filter(item => item.date === dateStr);
+      
+      // Debug logging (only log first few calls to avoid spam)
+      if (Math.random() < 0.01) { // Log 1% of calls
+        console.log('getAssignmentsForDate (class mode):', {
+          date: dateStr,
+          classScheduleLength: classSchedule.length,
+          foundItems: scheduleItems.length,
+          sampleScheduleItem: classSchedule[0]
+        });
+      }
       
       // Also check for multi-day holidays (e.g., Thanksgiving extends to next day)
       const dateObj = new Date(date);
@@ -160,7 +173,7 @@ export const useAssignments = ({
       return [];
     }
     
-    return allAssignments.filter(assignment => {
+    const filtered = allAssignments.filter(assignment => {
       const startDate = parseDate(assignment.startDate);
       const dueDate = parseDate(assignment.dueDate);
 
@@ -172,6 +185,23 @@ export const useAssignments = ({
       }
       return false;
     });
+    
+    // Debug logging (only log first few calls to avoid spam)
+    if (Math.random() < 0.01) { // Log 1% of calls
+      console.log('getAssignmentsForDate (assignment mode):', {
+        date: date.toDateString(),
+        allAssignmentsLength: allAssignments.length,
+        originalAssignmentsLength: originalAssignments?.length || 0,
+        foundItems: filtered.length,
+        sampleAssignment: allAssignments[0] ? {
+          itemName: allAssignments[0].itemName,
+          startDate: allAssignments[0].startDate,
+          parsedStart: parseDate(allAssignments[0].startDate)?.toDateString()
+        } : null
+      });
+    }
+    
+    return filtered;
   };
 
   return {

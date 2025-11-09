@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Calendar.css";
 import mavericksLogo from "../assets/mavericks-logo.png";
@@ -11,9 +11,11 @@ import FuturePlanningModal from "../components/Calendar/FuturePlanningModal";
 import ImportCalendarModal from "../components/Calendar/ImportCalendarModal";
 import ClearCalendarModal from "../components/Calendar/ClearCalendarModal";
 import EditAssignmentModal from "../components/Calendar/EditAssignmentModal";
+import DebugOverlay from "../components/Calendar/DebugOverlay";
 
 // Hooks
 import { useCourseCalendars } from "../hooks/useCourseCalendars";
+import { useDefaultCalendars } from "../hooks/useDefaultCalendars";
 import { useDragAndDrop } from "../hooks/useDragAndDrop";
 import { useEditMode } from "../hooks/useEditMode";
 import { useAssignments } from "../hooks/useAssignments";
@@ -63,14 +65,20 @@ function Calendar() {
   // Class schedule edit mode: track original schedule for undo
   const [classScheduleSnapshot, setClassScheduleSnapshot] = useState(null);
   
-  // Course management
-  const [selectedCourse, setSelectedCourse] = useState('CA 4201');
+  // Course management - start with no course selected
+  const [selectedCourse, setSelectedCourse] = useState(() => {
+    // Check if there's a saved selected course in localStorage
+    const saved = localStorage.getItem('selectedCourse');
+    // Only use saved value if it exists, otherwise start with first course
+    return saved || (COURSES.length > 0 ? COURSES[0].id : null);
+  });
   const [originalAssignments, setOriginalAssignments] = useState([]);
   const [acceptedFutureAssignments, setAcceptedFutureAssignments] = useState([]);
   
   // Clear calendar state (non-modal state stays here)
   const [selectedSemester, setSelectedSemester] = useState('');
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
+  const [showClearCalendarMenu, setShowClearCalendarMenu] = useState(false);
   const [clearDateRange, setClearDateRange] = useState({ start: null, end: null, label: '' });
   
   // Import calendar state (non-modal state stays here)
@@ -88,8 +96,17 @@ function Calendar() {
     getCourseCalendar,
     setCourseCalendar,
     updateAcceptedFutureAssignments,
-    clearCourseAssignmentsInRange
+    clearCourseAssignmentsInRange,
+    deleteCourseCalendar
   } = useCourseCalendars();
+
+  // Default calendars hook
+  const {
+    defaultCalendars,
+    getDefaultCalendar,
+    addDefaultCalendar,
+    removeDefaultCalendar
+  } = useDefaultCalendars();
 
   // Modal state hook
   const {
@@ -202,20 +219,52 @@ function Calendar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acceptedFutureAssignments, selectedCourse]);
 
+  // Save selected course to localStorage when it changes
+  useEffect(() => {
+    if (selectedCourse) {
+      localStorage.setItem('selectedCourse', selectedCourse);
+    }
+  }, [selectedCourse]);
+
+  // Track if we just imported a calendar to prevent useEffect from clearing it
+  const justImportedRef = useRef(false);
+
   // Load calendar data for the selected course
   useEffect(() => {
-    loadCourseCalendar(selectedCourse);
-  }, [selectedCourse]);
+    if (selectedCourse && !justImportedRef.current) {
+      loadCourseCalendar(selectedCourse);
+    }
+    // Reset the flag after a short delay to allow normal loading on course switch
+    if (justImportedRef.current) {
+      const timer = setTimeout(() => {
+        justImportedRef.current = false;
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedCourse]); // Only reload when selectedCourse changes
+  // Note: We don't depend on courseCalendars to avoid infinite loops
+  // The import function sets state directly, so we don't need to reload here
 
   // Load class schedule data when in class calendar mode or course changes
   useEffect(() => {
-    if (calendarMode === 'class') {
+    if (!selectedCourse) {
+      setClassSchedule([]);
+      return;
+    }
+    
+    // Only load class schedule if course has an imported calendar
+    const courseData = getCourseCalendar(selectedCourse);
+    if (calendarMode === 'class' && courseData && courseData.originalAssignments && courseData.originalAssignments.length > 0) {
       loadClassSchedule();
       // Don't disable edit mode - allow editing class schedule items
       // Clear snapshot when switching courses
       setClassScheduleSnapshot(null);
+    } else {
+      // No calendar imported - clear class schedule
+      setClassSchedule([]);
     }
-  }, [calendarMode, selectedCourse]);
+  }, [calendarMode, selectedCourse]); // Only depend on calendarMode and selectedCourse
+  // Note: We check courseCalendars inside the effect using getCourseCalendar to avoid dependency issues
 
   // Handle mouse move for ghost image
   useEffect(() => {
@@ -245,6 +294,15 @@ function Calendar() {
   // Load class schedule data
   const loadClassSchedule = async () => {
     try {
+      // Check if this calendar was explicitly cleared - if so, don't load anything
+      const clearedFlag = localStorage.getItem(`calendarCleared_${selectedCourse}`);
+      if (clearedFlag === 'true') {
+        setClassSchedule([]);
+        // Remove the flag after using it
+        localStorage.removeItem(`calendarCleared_${selectedCourse}`);
+        return;
+      }
+      
       // First check localStorage for saved modifications
       const scheduleKey = `classSchedule_${selectedCourse}`;
       const savedSchedule = localStorage.getItem(scheduleKey);
@@ -257,6 +315,14 @@ function Calendar() {
         } catch (e) {
           console.error('Error parsing saved class schedule:', e);
         }
+      }
+      
+      // Only load from API if the course has an imported calendar
+      // If no calendar is imported, don't load class schedule
+      const courseData = getCourseCalendar(selectedCourse);
+      if (!courseData || !courseData.originalAssignments || courseData.originalAssignments.length === 0) {
+        setClassSchedule([]);
+        return;
       }
       
       // If no saved schedule, load from API
@@ -569,12 +635,15 @@ function Calendar() {
   };
 
   // Load calendar data for a specific course
+  // ONLY loads from courseCalendars - NO hard-coded calendars, NO API calls
   const loadCourseCalendar = async (courseId) => {
     setLoading(true);
     try {
+      // ONLY check courseCalendars - no other sources
       const courseData = getCourseCalendar(courseId);
       
-      if (courseData) {
+      if (courseData && courseData.originalAssignments && courseData.originalAssignments.length > 0) {
+        // Only load if calendar was explicitly imported
         const originals = courseData.originalAssignments || [];
         const accepted = courseData.acceptedFutureAssignments || [];
         const adjustments = courseData.manualAdjustments || {};
@@ -583,70 +652,8 @@ function Calendar() {
         setAssignments(originals);
         setAcceptedFutureAssignments(accepted);
         setManualAdjustments(adjustments);
-      } else if (courseId === 'CA 4201') {
-        // Load from API for CA 4201 (default course)
-        const response = await fetch('/api/calendar/data');
-        const result = await response.json();
-        if (result.success) {
-          const originalData = JSON.parse(JSON.stringify(result.data));
-          setOriginalAssignments(originalData);
-          setAssignments(originalData);
-          setAcceptedFutureAssignments([]);
-          setManualAdjustments({});
-          
-          // Save to course calendars
-          setCourseCalendar(courseId, {
-            originalAssignments: originalData,
-            acceptedFutureAssignments: [],
-            manualAdjustments: {}
-          });
-        } else {
-          console.error('Failed to fetch calendar data:', result.error);
-        }
-      } else if (courseId === 'CA 4105') {
-        // Copy CA 4201 calendar to CA 4105 and shift from TR to MW
-        const ca4201Data = getCourseCalendar('CA 4201');
-        let sourceAssignments = [];
-        
-        if (ca4201Data && ca4201Data.originalAssignments) {
-          sourceAssignments = ca4201Data.originalAssignments;
-        } else {
-          // Try to load from API if not in localStorage
-          try {
-            const response = await fetch('/api/calendar/data');
-            const result = await response.json();
-            if (result.success) {
-              sourceAssignments = result.data;
-            }
-          } catch (error) {
-            console.error('Failed to fetch CA 4201 data:', error);
-          }
-        }
-        
-        if (sourceAssignments.length > 0) {
-          // Shift all dates from TR to MW schedule
-          const shiftedAssignments = copyAndShiftTRtoMW(sourceAssignments);
-          
-          setOriginalAssignments(shiftedAssignments);
-          setAssignments(shiftedAssignments);
-          setAcceptedFutureAssignments([]);
-          setManualAdjustments({});
-          
-          // Save to course calendars
-          setCourseCalendar(courseId, {
-            originalAssignments: shiftedAssignments,
-            acceptedFutureAssignments: [],
-            manualAdjustments: {}
-          });
-        } else {
-          // No source calendar available
-          setOriginalAssignments([]);
-          setAssignments([]);
-          setAcceptedFutureAssignments([]);
-          setManualAdjustments({});
-        }
       } else {
-        // No calendar for this course
+        // NO calendar - clear everything
         setOriginalAssignments([]);
         setAssignments([]);
         setAcceptedFutureAssignments([]);
@@ -654,6 +661,11 @@ function Calendar() {
       }
     } catch (error) {
       console.error('Error loading course calendar:', error);
+      // On error, clear everything
+      setOriginalAssignments([]);
+      setAssignments([]);
+      setAcceptedFutureAssignments([]);
+      setManualAdjustments({});
     } finally {
       setLoading(false);
     }
@@ -700,29 +712,587 @@ function Calendar() {
       setImportStartDate('');
       setImportCsvFile(null);
       
-      alert(`Successfully imported ${parsedData.length} assignments for ${importingCourse}`);
+      // No alert - just close the modal
     } catch (error) {
       console.error('Error importing calendar:', error);
       alert('Error importing calendar: ' + error.message);
     }
   };
 
-
-  // Clear assignments in a date range
-  const clearAssignmentsInRange = (startDate, endDate) => {
-    const rangeStart = normalizeDate(startDate);
-    const rangeEnd = endDate; // Already set to end of day
+  // Handle importing from default calendar
+  const handleImportDefaultCalendar = (defaultCalendarId) => {
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🟢 STEP 2: handleImportDefaultCalendar CALLED');
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('Default calendar ID:', defaultCalendarId);
+    console.log('Importing into course:', importingCourse);
+    console.log('Timestamp:', new Date().toISOString());
     
-    // Filter original assignments
-    const filteredOriginals = originalAssignments.filter(assignment => {
-      const start = normalizeDate(parseDate(assignment.startDate));
-      const due = normalizeDate(parseDate(assignment.dueDate));
-      const startInRange = start && start >= rangeStart && start <= rangeEnd;
-      const dueInRange = due && due >= rangeStart && due <= rangeEnd;
-      return !startInRange && !dueInRange;
+    if (!defaultCalendarId || !importingCourse) {
+      console.error('❌ Missing parameters - cannot import');
+      alert('Please select a default calendar.');
+      return;
+    }
+
+    try {
+      console.log('🔍 Looking up default calendar in localStorage...');
+      const defaultCal = getDefaultCalendar(defaultCalendarId);
+      console.log('Default calendar found:', {
+        exists: !!defaultCal,
+        hasAssignments: !!defaultCal?.assignments,
+        assignmentCount: defaultCal?.assignments?.length || 0,
+        hasClassSchedule: !!defaultCal?.classSchedule,
+        classScheduleCount: defaultCal?.classSchedule?.length || 0
+      });
+      
+      if (!defaultCal || !defaultCal.assignments) {
+        console.error('❌ Default calendar not found or has no assignments');
+        alert('Default calendar not found or has no assignments.');
+        return;
+      }
+
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🟢 STEP 3: COPYING DATA FROM DEFAULT CALENDAR');
+      console.log('═══════════════════════════════════════════════════════════');
+      
+      // Copy assignments from default calendar
+      const importedAssignments = JSON.parse(JSON.stringify(defaultCal.assignments));
+      console.log(`📋 Copied ${importedAssignments.length} assignments`);
+      
+      // Copy class schedule from default calendar
+      const importedClassSchedule = defaultCal.classSchedule 
+        ? JSON.parse(JSON.stringify(defaultCal.classSchedule))
+        : [];
+      console.log(`📅 Copied ${importedClassSchedule.length} class schedule items`);
+      
+      // Show first items from each
+      if (importedAssignments.length > 0) {
+        console.log('📝 FIRST ASSIGNMENT (from Assignment Calendar CSV):');
+        console.log(JSON.stringify(importedAssignments[0], null, 2));
+        console.log('  - itemName:', importedAssignments[0].itemName);
+        console.log('  - startDate:', importedAssignments[0].startDate, '→ parsed:', parseDate(importedAssignments[0].startDate));
+        console.log('  - dueDate:', importedAssignments[0].dueDate, '→ parsed:', parseDate(importedAssignments[0].dueDate));
+        console.log('  - startTime:', importedAssignments[0].startTime);
+        console.log('  - dueTime:', importedAssignments[0].dueTime);
+      }
+      
+      if (importedClassSchedule.length > 0) {
+        console.log('📚 FIRST CLASS SCHEDULE ITEM (from Class Calendar CSV):');
+        console.log(JSON.stringify(importedClassSchedule[0], null, 2));
+        console.log('  - date:', importedClassSchedule[0].date);
+        console.log('  - description:', importedClassSchedule[0].description);
+        console.log('  - type:', importedClassSchedule[0].type);
+      }
+
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🟢 STEP 4: SAVING TO COURSE CALENDAR');
+      console.log('═══════════════════════════════════════════════════════════');
+      
+      // Save to course calendars
+      setCourseCalendar(importingCourse, {
+        originalAssignments: importedAssignments,
+        acceptedFutureAssignments: [],
+        manualAdjustments: {}
+      });
+      console.log(`✅ Saved ${importedAssignments.length} assignments to courseCalendars['${importingCourse}']`);
+
+      // Normalize class schedule dates to ISO format before saving
+      const normalizedClassSchedule = importedClassSchedule.map(item => {
+        let dateStr = item.date;
+        // Ensure date is in ISO format (YYYY-MM-DD)
+        if (dateStr && dateStr.includes('-') && dateStr.split('-').length === 3) {
+          const parts = dateStr.split('-');
+          // Check if it's MM-DD-YYYY (first part is month, 1-2 digits, last part is 4-digit year)
+          if (parts[0].length <= 2 && parts[1].length <= 2 && parts[2].length === 4) {
+            // It's MM-DD-YYYY, convert to YYYY-MM-DD
+            const [month, day, year] = parts;
+            dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
+          // If it's already YYYY-MM-DD (first part is 4 digits), leave it as is
+        }
+        return {
+          ...item,
+          date: dateStr
+        };
+      });
+      
+      // Save class schedule to localStorage (ALWAYS save it, even if empty)
+      const scheduleKey = `classSchedule_${importingCourse}`;
+      localStorage.setItem(scheduleKey, JSON.stringify(normalizedClassSchedule));
+      console.log(`✅ Saved ${normalizedClassSchedule.length} class schedule items to localStorage['${scheduleKey}']`);
+
+      // If this is the currently selected course, load it immediately
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🟢 STEP 5: LOADING INTO FRONTEND COMPONENT STATE');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('Importing course:', importingCourse);
+      console.log('Selected course:', selectedCourse);
+      console.log('Courses match:', importingCourse === selectedCourse);
+      
+      if (importingCourse === selectedCourse) {
+        console.log('✅ Courses match - loading into component state immediately');
+        
+        // Set flag to prevent useEffect from clearing our imported data
+        justImportedRef.current = true;
+        console.log('✅ Set justImportedRef flag to prevent useEffect from clearing data');
+        
+        // Use already normalized class schedule (dates already converted to ISO above)
+        console.log(`✅ Using normalized class schedule with ${normalizedClassSchedule.length} items (dates in ISO format)`);
+        
+        console.log('🔄 Setting component state...');
+        setOriginalAssignments(importedAssignments);
+        console.log(`  ✅ setOriginalAssignments(${importedAssignments.length} items)`);
+        
+        setAssignments(importedAssignments);
+        console.log(`  ✅ setAssignments(${importedAssignments.length} items)`);
+        
+        setAcceptedFutureAssignments([]);
+        console.log(`  ✅ setAcceptedFutureAssignments([])`);
+        
+        setManualAdjustments({});
+        console.log(`  ✅ setManualAdjustments({})`);
+        
+        setClassSchedule(normalizedClassSchedule);
+        console.log(`  ✅ setClassSchedule(${normalizedClassSchedule.length} items)`);
+        
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('🟢 STEP 6: VERIFYING STATE AFTER SET');
+        console.log('═══════════════════════════════════════════════════════════');
+        
+        // Check state after React has had time to update
+        setTimeout(() => {
+          console.log('📊 STATE VERIFICATION (after React update):');
+          console.log('  originalAssignments.length:', originalAssignments?.length || 0);
+          console.log('  assignments.length:', assignments?.length || 0);
+          console.log('  classSchedule.length:', classSchedule?.length || 0);
+          console.log('  acceptedFutureAssignments.length:', acceptedFutureAssignments?.length || 0);
+          console.log('  manualAdjustments keys:', Object.keys(manualAdjustments || {}).length);
+          console.log('  calendarMode:', calendarMode);
+          console.log('  selectedCourse:', selectedCourse);
+          
+          // Check if data is actually there
+          if (originalAssignments && originalAssignments.length > 0) {
+            console.log('  ✅ originalAssignments has data');
+            console.log('  First assignment in state:', JSON.stringify(originalAssignments[0], null, 2));
+          } else {
+            console.error('  ❌ originalAssignments is empty or missing!');
+          }
+          
+          if (classSchedule && classSchedule.length > 0) {
+            console.log('  ✅ classSchedule has data');
+            console.log('  First class schedule item in state:', JSON.stringify(classSchedule[0], null, 2));
+          } else {
+            console.error('  ❌ classSchedule is empty or missing!');
+          }
+          
+          // Test date parsing
+          if (originalAssignments && originalAssignments.length > 0) {
+            const testAssignment = originalAssignments[0];
+            const parsedStart = parseDate(testAssignment.startDate);
+            const parsedDue = parseDate(testAssignment.dueDate);
+            console.log('  Date parsing test:');
+            console.log(`    startDate: "${testAssignment.startDate}" → ${parsedStart ? parsedStart.toISOString() : 'NULL'}`);
+            console.log(`    dueDate: "${testAssignment.dueDate}" → ${parsedDue ? parsedDue.toISOString() : 'NULL'}`);
+            
+            if (!parsedStart && !parsedDue) {
+              console.error('  ❌ ERROR: Dates are not parsing correctly!');
+            }
+          }
+          
+          console.log('═══════════════════════════════════════════════════════════');
+          console.log('🟢 STEP 7: CALENDAR SHOULD NOW BE DISPLAYING');
+          console.log('═══════════════════════════════════════════════════════════');
+          console.log('If calendar is blank, check:');
+          console.log('  1. Are dates parsing correctly? (see above)');
+          console.log('  2. Is calendarMode correct? (assignment vs class)');
+          console.log('  3. Is getAssignmentsForDate finding matches?');
+          console.log('  4. Is CalendarGrid receiving the data?');
+          console.log('═══════════════════════════════════════════════════════════');
+        }, 300);
+      } else {
+        console.log('⚠️ Courses do not match - data saved but not loaded into view');
+        console.log('  User needs to select', importingCourse, 'to see the calendar');
+      }
+
+      // Close modal and reset
+      setShowImportCalendar(false);
+      setImportingCourse('');
+      
+      // No need to reload - we've already set all the state directly above
+      // The useEffect hooks will handle any necessary updates
+      
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('🟢 STEP 8: IMPORT COMPLETE - MODAL CLOSING');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('Modal closed, import process finished');
+      console.log('═══════════════════════════════════════════════════════════');
+      
+      // No alert - just close the modal
+    } catch (error) {
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('❌ ERROR DURING IMPORT');
+      console.error('═══════════════════════════════════════════════════════════');
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      console.error('Error name:', error.name);
+      console.error('Full error object:', error);
+      console.error('═══════════════════════════════════════════════════════════');
+      alert('Error importing default calendar: ' + error.message);
+    }
+  };
+
+  // Parse class schedule CSV (Date,Description format)
+  const parseClassScheduleCsv = (csvContent) => {
+    const lines = csvContent.split('\n').filter(line => line.trim());
+    if (lines.length < 2) {
+      return [];
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim());
+    const data = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      // Handle quoted fields
+      const values = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let j = 0; j < line.length; j++) {
+        const char = line[j];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          values.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      values.push(current.trim());
+
+      if (values.length >= 2) {
+        // Parse date from format like "25-Aug-25" to ISO format "YYYY-MM-DD"
+        const dateStr = values[0] || '';
+        let formattedDate = dateStr;
+        
+        // Try to parse date in format "DD-MMM-YY" or "DD-MMM-YYYY"
+        const dateMatch = dateStr.match(/(\d+)-([A-Za-z]+)-(\d+)/);
+        if (dateMatch) {
+          const day = dateMatch[1].padStart(2, '0');
+          const monthName = dateMatch[2];
+          const year = dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3];
+          
+          const monthMap = {
+            'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+            'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+            'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+          };
+          
+          const month = monthMap[monthName] || '01';
+          // Convert to ISO format (YYYY-MM-DD) for consistent date comparison
+          formattedDate = `${year}-${month}-${day}`;
+        } else {
+          // If already in MM-DD-YYYY format, convert to ISO
+          if (dateStr.includes('-') && dateStr.split('-').length === 3) {
+            const [month, day, year] = dateStr.split('-');
+            formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
+        }
+
+        const item = {
+          date: formattedDate,
+          description: values[1] || ''
+        };
+        data.push(item);
+      }
+    }
+
+    return data;
+  };
+
+  // Initialize default calendar - load from CSV files
+  useEffect(() => {
+    // Check if default calendar already exists
+    const existingDefault = getDefaultCalendar('default-college-algebra-mw-fall');
+    if (existingDefault && existingDefault.assignments && existingDefault.assignments.length > 0 && 
+        existingDefault.classSchedule && existingDefault.classSchedule.length > 0) {
+      // Already exists with both assignments and class schedule - done
+      return;
+    }
+    
+    // If it exists but is incomplete, remove it and reload from CSV
+    if (existingDefault) {
+      removeDefaultCalendar('default-college-algebra-mw-fall');
+      localStorage.removeItem('defaultCalendarsInitialized');
+    }
+
+    // Load both CSV files from public folder
+    const publicUrl = process.env.PUBLIC_URL || '';
+    const assignmentUrl = `${publicUrl}/Calendar/CA-MW-Fall-Assignment-Calendar.csv`;
+    const classScheduleUrl = `${publicUrl}/Calendar/CA-MW-Fall-Class-Calendar.csv`;
+    
+    Promise.all([
+      fetch(assignmentUrl).then(r => {
+        if (!r.ok) throw new Error(`Failed to load assignment calendar: ${r.status}`);
+        return r.text();
+      }),
+      fetch(classScheduleUrl).then(r => {
+        if (!r.ok) throw new Error(`Failed to load class calendar: ${r.status}`);
+        return r.text();
+      })
+    ])
+      .then(([assignmentCsv, classScheduleCsv]) => {
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('🟢 LOADING DEFAULT CALENDAR FROM CSV FILES');
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('Assignment CSV first 3 lines:');
+        console.log(assignmentCsv.split('\n').slice(0, 3).join('\n'));
+        console.log('Class Schedule CSV first 3 lines:');
+        console.log(classScheduleCsv.split('\n').slice(0, 3).join('\n'));
+        
+        // Verify Assignment CSV has correct headers
+        const assignmentHeader = assignmentCsv.split('\n')[0].trim();
+        if (!assignmentHeader.includes('Item Name') || !assignmentHeader.includes('Start Date')) {
+          console.error('❌ ERROR: Assignment CSV has wrong format!');
+          console.error('Expected: Item Name, Start Date, Start Time, Due Date, Due Time');
+          console.error('Got:', assignmentHeader);
+          throw new Error('Assignment CSV has incorrect format');
+        }
+        
+        // Verify Class Schedule CSV has correct headers
+        const classScheduleHeader = classScheduleCsv.split('\n')[0].trim();
+        if (!classScheduleHeader.includes('Date') || !classScheduleHeader.includes('Description')) {
+          console.error('❌ ERROR: Class Schedule CSV has wrong format!');
+          console.error('Expected: Date, Description');
+          console.error('Got:', classScheduleHeader);
+          throw new Error('Class Schedule CSV has incorrect format');
+        }
+        
+        // Parse assignment calendar CSV (Item Name, Start Date, Start Time, Due Date, Due Time)
+        const assignments = parseCsvFile(assignmentCsv);
+        console.log(`✅ Parsed ${assignments.length} assignments from Assignment CSV`);
+        if (assignments.length > 0) {
+          console.log('First assignment:', assignments[0]);
+          // Verify it's actually an assignment (should have itemName like "First Assignment")
+          if (assignments[0].itemName && assignments[0].itemName.includes('Introduction')) {
+            console.error('❌ ERROR: Assignment CSV contains class schedule data!');
+            console.error('First item should be "First Assignment" but got:', assignments[0].itemName);
+            console.error('Check that CA-MW-Fall-Assignment-Calendar.csv contains assignment data');
+            throw new Error('Assignment CSV file contains class schedule data instead of assignments');
+          }
+          console.log('✅ Verified: Assignment CSV loaded correctly');
+        }
+        
+        // Parse class schedule CSV (Date, Description)
+        const classScheduleItems = parseClassScheduleCsv(classScheduleCsv);
+        console.log(`✅ Parsed ${classScheduleItems.length} class schedule items from Class Schedule CSV`);
+        if (classScheduleItems.length > 0) {
+          console.log('First class schedule item:', classScheduleItems[0]);
+          // Verify it's actually a class schedule item (should have description like "Introduction, 1.1")
+          if (classScheduleItems[0].description && classScheduleItems[0].description.includes('First Assignment')) {
+            console.error('❌ ERROR: Class Schedule CSV contains assignment data!');
+            console.error('First item should be "Introduction, 1.1" but got:', classScheduleItems[0].description);
+            console.error('Check that CA-MW-Fall-Class-Calendar.csv contains class schedule data');
+            throw new Error('Class Schedule CSV file contains assignment data instead of class schedule');
+          }
+          console.log('✅ Verified: Class Schedule CSV loaded correctly');
+        }
+        
+        // Convert class schedule to the format expected by the app
+        // Ensure dates are in ISO format (YYYY-MM-DD) for proper comparison
+        const classSchedule = classScheduleItems.map(item => {
+          let dateStr = item.date;
+          // parseClassScheduleCsv should already convert to ISO, but double-check
+          // If date is in MM-DD-YYYY format (first part is 1-2 digits), convert to ISO (YYYY-MM-DD)
+          if (dateStr && dateStr.includes('-') && dateStr.split('-').length === 3) {
+            const parts = dateStr.split('-');
+            // Check if it's MM-DD-YYYY (first part is month, 1-2 digits)
+            if (parts[0].length <= 2 && parts[1].length <= 2 && parts[2].length === 4) {
+              // It's MM-DD-YYYY, convert to YYYY-MM-DD
+              const [month, day, year] = parts;
+              dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+            // If it's already YYYY-MM-DD (first part is 4 digits), leave it as is
+          }
+          return {
+            date: dateStr,
+            description: item.description,
+            type: 'classSchedule'
+          };
+        });
+
+        addDefaultCalendar({
+          id: 'default-college-algebra-mw-fall',
+          name: 'Default College Algebra Monday, Wednesday Fall Semester',
+          courseType: 'College Algebra',
+          schedule: 'Monday, Wednesday',
+          semester: 'Fall',
+          assignments: assignments,
+          classSchedule: classSchedule
+        });
+
+        localStorage.setItem('defaultCalendarsInitialized', 'true');
+      })
+      .catch(err => {
+        console.error('❌ Failed to load CSV files for default calendar:', err);
+        // Fallback: try loading from API
+        fetch('/api/calendar/class-schedule')
+          .then(response => response.json())
+          .then(result => {
+            if (result.success && result.data && result.data.length > 0) {
+              // Convert class schedule items to assignment format
+              const assignments = result.data.map(item => ({
+                itemName: item.description,
+                startDate: item.date,
+                startTime: null,
+                dueDate: item.date,
+                dueTime: null
+              }));
+
+              addDefaultCalendar({
+                id: 'default-college-algebra-mw-fall',
+                name: 'Default College Algebra Monday, Wednesday Fall Semester',
+                courseType: 'College Algebra',
+                schedule: 'Monday, Wednesday',
+                semester: 'Fall',
+                assignments: assignments,
+                classSchedule: result.data.map(item => ({
+                  date: item.date,
+                  description: item.description,
+                  type: 'classSchedule'
+                }))
+              });
+
+              localStorage.setItem('defaultCalendarsInitialized', 'true');
+              console.log('✓ Initialized default calendar from API with', assignments.length, 'assignments');
+            }
+          })
+          .catch(apiErr => {
+            console.error('❌ Failed to load from API as fallback:', apiErr);
+          });
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
+
+  // NOTE: Removed automatic calendar clearing - calendars should persist after import
+  // Calendars will only be cleared when user explicitly uses the "Clear Calendar" feature
+
+
+  // Clear calendar in a date range (both assignment calendar AND class schedule)
+  const clearAssignmentsInRange = (startDate, endDate) => {
+    let logMessages = [];
+    logMessages.push(`🔴 CLEARING ENTIRE CALENDAR (Assignments + Class Schedule)`);
+    logMessages.push(`Course: ${selectedCourse}`);
+    logMessages.push(`Date Range: ${startDate?.toLocaleDateString()} to ${endDate?.toLocaleDateString()}`);
+    
+    if (!selectedCourse) {
+      alert('ERROR: No course selected for clearing');
+      return;
+    }
+
+    const rangeStart = normalizeDate(startDate);
+    // Normalize endDate to end of day for proper comparison
+    const rangeEnd = new Date(endDate);
+    rangeEnd.setHours(23, 59, 59, 999);
+    
+    // Get current calendar data from localStorage directly to ensure we have the latest
+    let allCalendars = {};
+    try {
+      allCalendars = JSON.parse(localStorage.getItem('courseCalendars') || '{}');
+      logMessages.push(`📦 Calendars in localStorage: ${Object.keys(allCalendars).join(', ') || 'NONE'}`);
+    } catch (e) {
+      alert(`ERROR reading calendars: ${e.message}`);
+      return;
+    }
+
+    const courseData = allCalendars[selectedCourse];
+    if (!courseData) {
+      alert(`No calendar data found for ${selectedCourse}`);
+      return;
+    }
+    
+    const originalCount = courseData.originalAssignments?.length || 0;
+    const acceptedCount = courseData.acceptedFutureAssignments?.length || 0;
+    logMessages.push(`📚 Found calendar: ${originalCount} original, ${acceptedCount} accepted assignments`);
+
+    // Filter original assignments from the stored data
+    const currentOriginals = courseData.originalAssignments || [];
+    logMessages.push(`🔍 Filtering ${currentOriginals.length} original assignments`);
+    logMessages.push(`📅 Range: ${rangeStart?.toLocaleDateString()} to ${rangeEnd?.toLocaleDateString()}`);
+    logMessages.push(`📅 Range times: ${rangeStart?.toISOString()} to ${rangeEnd?.toISOString()}`);
+    
+    let removedCount = 0;
+    let sampleAssignments = [];
+    const filteredOriginals = currentOriginals.filter((assignment, index) => {
+      const start = parseDate(assignment.startDate);
+      const due = parseDate(assignment.dueDate);
+      
+      // Normalize assignment dates to midnight for comparison
+      const startNormalized = start ? normalizeDate(start) : null;
+      const dueNormalized = due ? normalizeDate(due) : null;
+      
+      // Log first 3 assignments for debugging
+      if (index < 3) {
+        sampleAssignments.push({
+          name: assignment.itemName,
+          startDate: assignment.startDate,
+          dueDate: assignment.dueDate,
+          parsedStart: startNormalized?.toISOString(),
+          parsedDue: dueNormalized?.toISOString(),
+          rangeStart: rangeStart?.toISOString(),
+          rangeEnd: rangeEnd?.toISOString()
+        });
+      }
+      
+      // Compare dates properly - check if assignment overlaps with range
+      // An assignment is in range if its start OR due date falls within the range
+      const startInRange = startNormalized && startNormalized >= rangeStart && startNormalized <= rangeEnd;
+      const dueInRange = dueNormalized && dueNormalized >= rangeStart && dueNormalized <= rangeEnd;
+      // Also check if assignment spans the range (starts before and ends after)
+      const spansRange = startNormalized && dueNormalized && startNormalized < rangeStart && dueNormalized > rangeEnd;
+      const shouldRemove = startInRange || dueInRange || spansRange;
+      
+      if (shouldRemove) {
+        removedCount++;
+        logMessages.push(`  ❌ Removing: ${assignment.itemName} (${assignment.startDate} to ${assignment.dueDate})`);
+      }
+      return !shouldRemove;
     });
     
-    // Filter pending future assignments
+    if (sampleAssignments.length > 0) {
+      logMessages.push(`📋 Sample assignments:`);
+      sampleAssignments.forEach(sample => {
+        logMessages.push(`  - ${sample.name}: start=${sample.startDate} (${sample.parsedStart}), due=${sample.dueDate} (${sample.parsedDue})`);
+      });
+    }
+    
+    logMessages.push(`✅ After filtering: ${filteredOriginals.length} remaining (removed ${removedCount})`);
+    
+    // Filter accepted future assignments from the stored data
+    const currentAccepted = courseData.acceptedFutureAssignments || [];
+    logMessages.push(`🔍 Filtering ${currentAccepted.length} accepted future assignments`);
+    let removedAcceptedCount = 0;
+    const filteredAccepted = currentAccepted.filter(assignment => {
+      const start = parseDate(assignment.startDate);
+      const due = parseDate(assignment.dueDate);
+      const startNormalized = start ? normalizeDate(start) : null;
+      const dueNormalized = due ? normalizeDate(due) : null;
+      const startInRange = startNormalized && startNormalized >= rangeStart && startNormalized <= rangeEnd;
+      const dueInRange = dueNormalized && dueNormalized >= rangeStart && dueNormalized <= rangeEnd;
+      const spansRange = startNormalized && dueNormalized && startNormalized < rangeStart && dueNormalized > rangeEnd;
+      const shouldRemove = startInRange || dueInRange || spansRange;
+      if (shouldRemove) {
+        removedAcceptedCount++;
+        logMessages.push(`  ❌ Removing accepted: ${assignment.itemName} (${assignment.startDate} to ${assignment.dueDate})`);
+      }
+      return !shouldRemove;
+    });
+    logMessages.push(`✅ After filtering accepted: ${filteredAccepted.length} remaining (removed ${removedAcceptedCount})`);
+    
+    // Filter pending future assignments from component state
     const filteredPending = offsetAssignments.filter(assignment => {
       const start = normalizeDate(parseDate(assignment.startDate));
       const due = normalizeDate(parseDate(assignment.dueDate));
@@ -731,23 +1301,78 @@ function Calendar() {
       return !startInRange && !dueInRange;
     });
     
-    // Filter accepted future assignments - also clear these permanently
-    const filteredAccepted = acceptedFutureAssignments.filter(assignment => {
-      const start = normalizeDate(parseDate(assignment.startDate));
-      const due = normalizeDate(parseDate(assignment.dueDate));
-      const startInRange = start && start >= rangeStart && start <= rangeEnd;
-      const dueInRange = due && due >= rangeStart && due <= rangeEnd;
-      return !startInRange && !dueInRange;
+    // Also clear class schedule items in the date range
+    // Get class schedule from localStorage directly (not component state, which might be stale)
+    let currentClassSchedule = [];
+    try {
+      const scheduleKey = `classSchedule_${selectedCourse}`;
+      const savedSchedule = localStorage.getItem(scheduleKey);
+      if (savedSchedule) {
+        currentClassSchedule = JSON.parse(savedSchedule);
+      } else {
+        // If not in localStorage, use component state
+        currentClassSchedule = classSchedule;
+      }
+    } catch (e) {
+      console.error('Error reading class schedule from localStorage:', e);
+      currentClassSchedule = classSchedule;
+    }
+    
+    const filteredClassSchedule = currentClassSchedule.filter(scheduleItem => {
+      const itemDate = normalizeDate(parseDate(scheduleItem.date));
+      return !itemDate || itemDate < rangeStart || itemDate > rangeEnd;
     });
     
-    // Update all state
-    setOriginalAssignments(filteredOriginals);
-    setOffsetAssignments(filteredPending);
-    setAcceptedFutureAssignments(filteredAccepted);
-    setAssignments(filteredOriginals);
+    logMessages.push(`📅 Class schedule: ${currentClassSchedule.length} items, ${filteredClassSchedule.length} remaining after filter`);
     
-    // Update course calendar in storage
-    clearCourseAssignmentsInRange(selectedCourse, startDate, endDate, normalizeDate, parseDate);
+    // Check if calendar is now empty (no assignments remaining)
+    const totalRemaining = filteredOriginals.length + filteredAccepted.length;
+    
+    // ALWAYS delete the entire calendar when clearing - don't keep partial calendars
+    // This ensures the course goes back to "no calendar" state and shows "Import Calendar" option
+    logMessages.push(`🗑️ DELETING ENTIRE CALENDAR (Assignments + Class Schedule)`);
+    logMessages.push(`   - Removed ${removedCount} assignments from assignment calendar`);
+    logMessages.push(`   - Removed ${removedAcceptedCount} accepted future assignments`);
+    logMessages.push(`   - Removed ${currentClassSchedule.length - filteredClassSchedule.length} class schedule items`);
+    logMessages.push(`   - Course will now show "Import Calendar" option`);
+    
+    // Remove from the calendars object - DELETE ENTIRE CALENDAR
+    delete allCalendars[selectedCourse];
+    
+    // Save to localStorage immediately and synchronously
+    localStorage.setItem('courseCalendars', JSON.stringify(allCalendars));
+    logMessages.push(`✓ Removed entire calendar for ${selectedCourse} from localStorage`);
+    
+    // Also clear class schedule from localStorage - DELETE IT COMPLETELY
+    const scheduleKey = `classSchedule_${selectedCourse}`;
+    localStorage.removeItem(scheduleKey);
+    logMessages.push(`✓ Removed class schedule for ${selectedCourse} from localStorage`);
+    
+    // Set a flag to prevent reloading from API after page refresh
+    localStorage.setItem(`calendarCleared_${selectedCourse}`, 'true');
+    
+    // Verify it's gone
+    const verify = JSON.parse(localStorage.getItem('courseCalendars') || '{}');
+    logMessages.push(`🔍 Verification: ${Object.keys(verify).length} calendars remaining: ${Object.keys(verify).join(', ') || 'NONE'}`);
+    const verifySchedule = localStorage.getItem(scheduleKey);
+    logMessages.push(`🔍 Class schedule verification: ${verifySchedule ? 'STILL EXISTS (ERROR!)' : 'REMOVED ✓'}`);
+    
+    // Show log
+    alert(logMessages.join('\n'));
+    
+    // Also update the hook state
+    deleteCourseCalendar(selectedCourse);
+    
+    // Clear all component state immediately
+    setOriginalAssignments([]);
+    setOffsetAssignments([]);
+    setAcceptedFutureAssignments([]);
+    setAssignments([]);
+    setManualAdjustments({});
+    setClassSchedule([]);
+    // Note: We always delete the entire calendar when clearing, so there's no "else" branch
+    // If you want to support partial clearing (keeping some assignments), that would go here
+    // But for now, clearing always means "delete everything and show Import Calendar option"
   };
 
   // Handle semester selection for clearing
@@ -760,11 +1385,26 @@ function Calendar() {
   // Confirm and clear the selected semester
   const confirmClearSemester = () => {
     if (clearDateRange.start && clearDateRange.end) {
-      clearAssignmentsInRange(clearDateRange.start, clearDateRange.end);
-      setShowClearCalendar(false);
+      // Save the date range before clearing state
+      const startDate = clearDateRange.start;
+      const endDate = clearDateRange.end;
+      
+      // Close all modals FIRST before clearing to prevent overlay blocking
+      setShowClearCalendarMenu(false);
       setShowClearConfirmation(false);
       setSelectedSemester('');
       setClearDateRange({ start: null, end: null, label: '' });
+      closeAllModals();
+      
+      // Small delay to ensure modals are closed, then clear and refresh
+      setTimeout(() => {
+        clearAssignmentsInRange(startDate, endDate);
+        
+        // Give time for localStorage to update, then refresh
+        setTimeout(() => {
+          window.location.reload();
+        }, 200);
+      }, 50);
     }
   };
 
@@ -876,6 +1516,7 @@ function Calendar() {
         courseCalendars={courseCalendars}
         onCourseSelect={setSelectedCourse}
         onImportClick={(courseId) => {
+          setSelectedCourse(courseId);
           setImportingCourse(courseId);
           setShowImportCalendar(true);
         }}
@@ -890,12 +1531,37 @@ function Calendar() {
             }}>
               Future Planning
             </button>
-            <button className="clear-calendar-button" onClick={() => {
-              setShowClearCalendar(true);
-              setSelectedSemester('');
-            }}>
-              Clear Calendar
-            </button>
+            <div style={{ position: 'relative' }}>
+              <button className="clear-calendar-button" onClick={(e) => {
+                e.stopPropagation();
+                setShowClearCalendarMenu(!showClearCalendarMenu);
+                setSelectedSemester('');
+              }}>
+                Clear Calendar
+              </button>
+              {showClearCalendarMenu && (
+                <ClearCalendarModal
+                  show={showClearCalendarMenu}
+                  showConfirmation={showClearConfirmation}
+                  selectedSemester={selectedSemester}
+                  clearDateRange={clearDateRange}
+                  originalAssignments={originalAssignments}
+                  acceptedFutureAssignments={acceptedFutureAssignments}
+                  selectedCourse={selectedCourse}
+                  onClose={() => {
+                    setShowClearCalendarMenu(false);
+                    setSelectedSemester('');
+                  }}
+                  onSemesterSelect={handleSemesterSelect}
+                  onConfirm={confirmClearSemester}
+                  onCancel={() => {
+                    setShowClearConfirmation(false);
+                    setSelectedSemester('');
+                    setClearDateRange({ start: null, end: null, label: '' });
+                  }}
+                />
+              )}
+            </div>
             <button 
               className="calendar-mode-toggle-button" 
               onClick={() => {
@@ -912,7 +1578,15 @@ function Calendar() {
           </div>
           <img src={mavericksLogo} alt="Mavericks Logo" className="calendar-logo" />
           <h1 className="calendar-title">Academic Calendar</h1>
-          <button className="back-button" onClick={() => navigate('/')}>
+          <button 
+            className="back-button" 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // Use window.location for hard navigation to ensure it works
+              window.location.href = '/';
+            }}
+          >
             ← Back to Home
           </button>
         </header>
@@ -937,7 +1611,10 @@ function Calendar() {
         )}
 
         <main className="calendar-main">
-          {((courseCalendars[selectedCourse] || selectedCourse === 'CA 4201') || calendarMode === 'class') && (
+          {/* ONLY show calendar if it was explicitly imported - NO class schedule mode without imported calendar */}
+          {/* Check component state first for immediate UI updates, then fall back to courseCalendars */}
+          {((originalAssignments && originalAssignments.length > 0) ||
+            (courseCalendars[selectedCourse] && courseCalendars[selectedCourse].originalAssignments && courseCalendars[selectedCourse].originalAssignments.length > 0)) && (
             <>
               <div className="calendar-controls">
                 <div className="controls-left">
@@ -1075,7 +1752,7 @@ function Calendar() {
             />
           )}
 
-          {!courseCalendars[selectedCourse] && selectedCourse !== 'CA 4201' ? (
+          {!courseCalendars[selectedCourse] ? (
             <div className="no-calendar-message">
               <div className="no-calendar-content">
                 <h2>No Calendar Available</h2>
@@ -1148,27 +1825,9 @@ function Calendar() {
         onStartDateChange={setImportStartDate}
         onFileChange={setImportCsvFile}
         onImport={handleImportCalendar}
+        onImportDefault={handleImportDefaultCalendar}
       />
 
-      <ClearCalendarModal
-        show={showClearCalendar}
-        showConfirmation={showClearConfirmation}
-        selectedSemester={selectedSemester}
-        clearDateRange={clearDateRange}
-        originalAssignments={originalAssignments}
-        acceptedFutureAssignments={acceptedFutureAssignments}
-        onClose={() => {
-          setShowClearCalendar(false);
-          setSelectedSemester('');
-        }}
-        onSemesterSelect={handleSemesterSelect}
-        onConfirm={confirmClearSemester}
-        onCancel={() => {
-          setShowClearConfirmation(false);
-          setSelectedSemester('');
-          setClearDateRange({ start: null, end: null, label: '' });
-        }}
-      />
 
       <EditAssignmentModal
         show={showEditAssignmentModal}
@@ -1179,6 +1838,8 @@ function Calendar() {
         }}
         onSave={handleSaveAssignmentEdit}
       />
+
+      <DebugOverlay />
     </div>
   );
 }

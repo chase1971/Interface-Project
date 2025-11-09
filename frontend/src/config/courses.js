@@ -22,7 +22,7 @@ export const COURSES = [
     id: 'CA 4201', 
     name: 'CA 4201', 
     schedule: 'TTH 8:00-9:20', 
-    hasCalendar: true 
+    hasCalendar: false 
   },
   { 
     id: 'FM 4202', 

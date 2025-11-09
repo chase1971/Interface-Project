@@ -67,12 +67,22 @@ export const useCourseCalendars = () => {
     };
   };
 
+  // Delete a course calendar entirely
+  const deleteCourseCalendar = (courseId) => {
+    setCourseCalendars(prev => {
+      const updated = { ...prev };
+      delete updated[courseId];
+      return updated;
+    });
+  };
+
   return {
     courseCalendars,
     getCourseCalendar,
     setCourseCalendar,
     updateAcceptedFutureAssignments,
-    clearCourseAssignmentsInRange
+    clearCourseAssignmentsInRange,
+    deleteCourseCalendar
   };
 };
 

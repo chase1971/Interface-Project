@@ -37,31 +37,41 @@ const CourseSidebar = ({ courses, selectedCourse, courseCalendars, onCourseSelec
         <h3 className="course-sidebar-title">Courses</h3>
       </div>
       <div className="course-list">
-        {courses.map(course => (
-          <div
-            key={course.id}
-            className={`course-item ${selectedCourse === course.id ? 'selected' : ''} ${!course.hasCalendar && !courseCalendars[course.id] ? 'no-calendar' : ''}`}
-            onClick={() => {
-              if (course.hasCalendar || courseCalendars[course.id]) {
-                onCourseSelect(course.id);
-              }
-            }}
-          >
-            <div className="course-name">{course.name}</div>
-            <div className="course-schedule">{course.schedule}</div>
-            {!course.hasCalendar && !courseCalendars[course.id] && (
-              <button 
-                className="import-calendar-button-small"
-                onClick={(e) => {
-                  e.stopPropagation();
+        {courses.map(course => {
+          // Only check courseCalendars - ignore hard-coded hasCalendar flag
+          // A course only has a calendar if it was explicitly imported
+          const hasCalendar = courseCalendars[course.id] && 
+                             courseCalendars[course.id].originalAssignments && 
+                             courseCalendars[course.id].originalAssignments.length > 0;
+          return (
+            <div
+              key={course.id}
+              className={`course-item ${selectedCourse === course.id ? 'selected' : ''} ${!hasCalendar ? 'no-calendar' : ''}`}
+              onClick={() => {
+                if (hasCalendar) {
+                  onCourseSelect(course.id);
+                } else {
+                  // If no calendar, open import modal
                   onImportClick(course.id);
-                }}
-              >
-                Import Calendar
-              </button>
-            )}
-          </div>
-        ))}
+                }
+              }}
+            >
+              <div className="course-name">{course.name}</div>
+              <div className="course-schedule">{course.schedule}</div>
+              {!hasCalendar && (
+                <button 
+                  className="import-calendar-button-small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onImportClick(course.id);
+                  }}
+                >
+                  Import Calendar
+                </button>
+              )}
+            </div>
+          );
+        })}
         <div className="semester-button-wrapper">
           <button 
             className="semester-toggle-button"
