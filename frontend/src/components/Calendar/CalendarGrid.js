@@ -312,7 +312,26 @@ const CalendarGrid = ({
             );
           })}
           {dateAssignments.length > 1 && (
-            <div className="assignment-more">+{dateAssignments.length - 1} more</div>
+            <div 
+              className="assignment-more"
+              onClick={(e) => {
+                // Explicitly handle clicks on "plus more" to open expanded modal
+                e.stopPropagation();
+                const rect = e.currentTarget.closest('.calendar-day')?.getBoundingClientRect();
+                if (rect) {
+                  const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                  const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+                  onDayClick(date, {
+                    top: rect.top + scrollTop,
+                    left: rect.left + scrollLeft,
+                    width: rect.width,
+                    height: rect.height
+                  });
+                }
+              }}
+            >
+              +{dateAssignments.length - 1} more
+            </div>
           )}
         </div>
       </div>

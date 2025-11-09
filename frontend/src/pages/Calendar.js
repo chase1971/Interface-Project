@@ -503,20 +503,51 @@ function Calendar() {
     debugLog('Found item to move:', itemToMove);
     
     // Check if target date is empty (no item on target date)
-    const targetDateItem = updatedSchedule.find(item => item.date === targetDateStr);
+    // Exclude fixed holidays and final exams from collision check - they don't count as "occupied"
+    const targetDateItem = updatedSchedule.find(item => {
+      if (item.date !== targetDateStr) return false;
+      // Check if this is a fixed item (holiday or final exam) - these don't count as collisions
+      const desc = (item.description || '').toLowerCase();
+      const isFixed = desc.includes('thanksgiving') || 
+                      desc.includes('labor day') || 
+                      desc.includes('holiday') || 
+                      desc.includes('christmas') || 
+                      desc.includes('new year') || 
+                      desc.includes('easter') || 
+                      desc.includes('memorial day') || 
+                      desc.includes('independence day') || 
+                      desc.includes('presidents day') || 
+                      desc.includes('martin luther king') || 
+                      desc.includes('mlk day') || 
+                      desc.includes('spring break') ||
+                      desc.includes('final exam') || 
+                      desc.includes('final');
+      // Only count as occupied if it's NOT a fixed item
+      return !isFixed;
+    });
     const isTargetEmpty = !targetDateItem;
     
-    debugLog('Target date status', { targetDateStr, isTargetEmpty, targetItem: targetDateItem });
+    debugLog('Target date status', { 
+      targetDateStr, 
+      isTargetEmpty, 
+      targetItem: targetDateItem,
+      allItemsOnTarget: updatedSchedule.filter(item => item.date === targetDateStr).map(i => ({ desc: i.description, isFixed: (i.description || '').toLowerCase().includes('thanksgiving') || (i.description || '').toLowerCase().includes('final') }))
+    });
     
     // Convert to format expected by cascadeMoveItems
     const scheduleItemsForCascade = updatedSchedule.map(item => {
       // Detect item type
       const desc = item.description.toLowerCase();
       let itemType = 'regular';
-      if (desc.includes('thanksgiving') || desc.includes('labor day') || desc.includes('holiday') || desc.includes('christmas') || desc.includes('new year') || desc.includes('easter') || desc.includes('memorial day') || desc.includes('independence day') || desc.includes('presidents day') || desc.includes('martin luther king') || desc.includes('mlk day')) {
+      let isFixed = false;
+      
+      // Check if this is a fixed holiday or final exam (should not be moved)
+      if (desc.includes('thanksgiving') || desc.includes('labor day') || desc.includes('holiday') || desc.includes('christmas') || desc.includes('new year') || desc.includes('easter') || desc.includes('memorial day') || desc.includes('independence day') || desc.includes('presidents day') || desc.includes('martin luther king') || desc.includes('mlk day') || desc.includes('spring break')) {
         itemType = 'holiday';
+        isFixed = true; // Holidays should not be moved by cascading
       } else if (desc.includes('final exam') || desc.includes('final')) {
         itemType = 'exam';
+        isFixed = true; // Final exams should not be moved by cascading
       } else if (desc.includes('test')) {
         itemType = 'test';
       } else if (desc.includes('quiz')) {
@@ -530,8 +561,7 @@ function Calendar() {
         description: item.description,
         classScheduleType: itemType,
         isClassSchedule: true,
-        // Allow all items to be moved (no restrictions)
-        isFixedHoliday: false
+        isFixedHoliday: isFixed // Mark holidays and final exams as fixed so they don't get moved
       };
     });
     
@@ -586,14 +616,44 @@ function Calendar() {
     });
     
     debugLog('Cascaded map created with', cascadedMap.size, 'items');
+    debugLog('Fixed items in original schedule:', updatedSchedule.filter(item => {
+      const desc = (item.description || '').toLowerCase();
+      return desc.includes('thanksgiving') || desc.includes('final exam') || desc.includes('final');
+    }).map(i => ({ desc: i.description, date: i.date })));
     
     const newClassSchedule = updatedSchedule.map(item => {
+      // Check if this is a fixed item (holiday or final exam) - NEVER update these
+      const desc = (item.description || '').toLowerCase();
+      const isFixed = desc.includes('thanksgiving') || 
+                      desc.includes('labor day') || 
+                      desc.includes('holiday') || 
+                      desc.includes('christmas') || 
+                      desc.includes('new year') || 
+                      desc.includes('easter') || 
+                      desc.includes('memorial day') || 
+                      desc.includes('independence day') || 
+                      desc.includes('presidents day') || 
+                      desc.includes('martin luther king') || 
+                      desc.includes('mlk day') || 
+                      desc.includes('spring break') ||
+                      desc.includes('final exam') || 
+                      desc.includes('final');
+      
+      if (isFixed) {
+        // Fixed items should NEVER have their dates changed - preserve original date
+        debugLog('Preserving fixed item date (holiday/final exam)', { 
+          description: item.description, 
+          date: item.date 
+        });
+        return item; // Return unchanged
+      }
+      
       // Find the cascaded item that matches this description
       const key = item.description;
       const cascadedItem = cascadedMap.get(key);
       
       if (cascadedItem) {
-        // Always update the date from cascaded item
+        // Only update the date from cascaded item if it's not a fixed item
         const newDate = cascadedItem.date;
         if (newDate !== item.date) {
           debugLog('Updating item date', { 
@@ -1716,15 +1776,22 @@ function Calendar() {
 
   // Handle day click for expanded modal
   const handleDayClick = (date, position) => {
-    // Don't open expanded modal in edit mode (drag operations take priority)
-    if (isEditMode) {
-      return;
-    }
-    
     // Don't open expanded modal in class calendar mode
     // Class calendars only have one item per date, so no need for expanded view
     if (calendarMode === 'class') {
       return;
+    }
+    
+    // In edit mode, only block if there's an active drag operation
+    // Otherwise, allow opening the expanded modal to view/edit multiple items
+    if (isEditMode && calendarMode === 'assignment') {
+      // Check if there's an active drag or pickup operation
+      const hasActiveDrag = draggedAssignment || pickedUpAssignment;
+      if (hasActiveDrag) {
+        // Don't open modal during drag - let the drop happen instead
+        return;
+      }
+      // No active drag - allow opening modal to view/edit multiple items
     }
     
     // Check if there are multiple items on this date
@@ -1917,20 +1984,37 @@ function Calendar() {
                 </h2>
                 <div className="controls-right">
                   {isEditMode && calendarMode === 'assignment' && (
-                    <button 
-                      className={`nav-button undo-button ${!hasChanges() ? 'disabled' : ''}`}
-                      onClick={handleUndo}
-                      disabled={!hasChanges()}
-                      style={{
-                        background: !hasChanges() ? 'rgba(100, 100, 100, 0.1)' : 'rgba(255, 152, 0, 0.2)',
-                        borderColor: !hasChanges() ? 'var(--text-dim)' : '#ff9800',
-                        color: !hasChanges() ? 'var(--text-dim)' : '#ff9800',
-                        opacity: !hasChanges() ? 0.5 : 1,
-                        cursor: !hasChanges() ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      ↶ Undo Changes
-                    </button>
+                    <>
+                      <button 
+                        className={`nav-button undo-button ${!hasChanges() ? 'disabled' : ''}`}
+                        onClick={handleUndo}
+                        disabled={!hasChanges()}
+                        style={{
+                          background: !hasChanges() ? 'rgba(100, 100, 100, 0.1)' : 'rgba(255, 152, 0, 0.2)',
+                          borderColor: !hasChanges() ? 'var(--text-dim)' : '#ff9800',
+                          color: !hasChanges() ? 'var(--text-dim)' : '#ff9800',
+                          opacity: !hasChanges() ? 0.5 : 1,
+                          cursor: !hasChanges() ? 'not-allowed' : 'pointer',
+                          marginRight: '10px'
+                        }}
+                      >
+                        ↶ Undo Changes
+                      </button>
+                      <button 
+                        className="nav-button save-button"
+                        onClick={handleExitEditMode}
+                        style={{
+                          background: hasChanges() ? 'rgba(76, 175, 80, 0.2)' : 'rgba(100, 100, 100, 0.1)',
+                          borderColor: hasChanges() ? '#4caf50' : 'var(--text-dim)',
+                          color: hasChanges() ? '#4caf50' : 'var(--text-dim)',
+                          opacity: hasChanges() ? 1 : 0.5,
+                          cursor: hasChanges() ? 'pointer' : 'not-allowed'
+                        }}
+                        disabled={!hasChanges()}
+                      >
+                        ✓ Save Changes
+                      </button>
+                    </>
                   )}
                   {isEditMode && calendarMode === 'class' && (
                     <>
@@ -1952,6 +2036,7 @@ function Calendar() {
                       <button 
                         className="nav-button save-button"
                         onClick={handleExitClassEditMode}
+                        disabled={!hasClassScheduleChanges()}
                         style={{
                           background: hasClassScheduleChanges() ? 'rgba(76, 175, 80, 0.2)' : 'rgba(100, 100, 100, 0.1)',
                           borderColor: hasClassScheduleChanges() ? '#4caf50' : 'var(--text-dim)',
@@ -2175,3 +2260,4 @@ function Calendar() {
 }
 
 export default Calendar;
+
