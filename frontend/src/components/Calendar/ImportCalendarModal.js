@@ -10,7 +10,8 @@ const ImportCalendarModal = ({
   onStartDateChange,
   onFileChange,
   onImport,
-  onImportDefault
+  onImportDefault,
+  onRefreshDefaults
 }) => {
   const { defaultCalendars, getDefaultCalendarsByFilter } = useDefaultCalendars();
   const [selectedDefaultCalendar, setSelectedDefaultCalendar] = useState(null);
@@ -31,6 +32,16 @@ const ImportCalendarModal = ({
     if (show) {
       console.log('ImportCalendarModal - Available default calendars:', availableDefaults);
       console.log('ImportCalendarModal - defaultCalendars from hook:', defaultCalendars);
+      console.log('ImportCalendarModal - Calendar count:', availableDefaults.length);
+      if (availableDefaults.length > 0) {
+        console.log('ImportCalendarModal - Calendar IDs:', availableDefaults.map(cal => cal.id));
+        console.log('ImportCalendarModal - Calendar names:', availableDefaults.map(cal => cal.name));
+      } else {
+        console.warn('⚠️ No default calendars available! Check localStorage for "defaultCalendars"');
+        // Check localStorage directly
+        const stored = localStorage.getItem('defaultCalendars');
+        console.log('ImportCalendarModal - localStorage defaultCalendars:', stored);
+      }
     }
   }, [show, availableDefaults, defaultCalendars]);
 
@@ -167,33 +178,56 @@ const ImportCalendarModal = ({
 
         <div style={{ 
           display: 'flex', 
+          flexDirection: 'column',
           gap: '0.5rem', 
           marginTop: '0.5rem'
         }}>
-          <button 
-            className="semester-menu-button"
-            onClick={handleImportDefaultClick}
-            disabled={!selectedDefaultCalendar}
-            style={{
-              flex: 1,
-              background: selectedDefaultCalendar ? 'var(--accent-blue)' : 'transparent',
-              color: selectedDefaultCalendar ? 'white' : 'var(--text-dim)',
-              borderColor: selectedDefaultCalendar ? 'var(--accent-blue)' : 'var(--border-color)',
-              opacity: selectedDefaultCalendar ? 1 : 0.5,
-              cursor: selectedDefaultCalendar ? 'pointer' : 'not-allowed'
-            }}
-          >
-            Import
-          </button>
-          <button 
-            className="semester-menu-button"
-            onClick={onClose}
-            style={{
-              flex: 1
-            }}
-          >
-            Cancel
-          </button>
+          <div style={{ 
+            display: 'flex', 
+            gap: '0.5rem'
+          }}>
+            <button 
+              className="semester-menu-button"
+              onClick={handleImportDefaultClick}
+              disabled={!selectedDefaultCalendar}
+              style={{
+                flex: 1,
+                background: selectedDefaultCalendar ? 'var(--accent-blue)' : 'transparent',
+                color: selectedDefaultCalendar ? 'white' : 'var(--text-dim)',
+                borderColor: selectedDefaultCalendar ? 'var(--accent-blue)' : 'var(--border-color)',
+                opacity: selectedDefaultCalendar ? 1 : 0.5,
+                cursor: selectedDefaultCalendar ? 'pointer' : 'not-allowed'
+              }}
+            >
+              Import
+            </button>
+            <button 
+              className="semester-menu-button"
+              onClick={onClose}
+              style={{
+                flex: 1
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+          {onRefreshDefaults && (
+            <button 
+              className="semester-menu-button"
+              onClick={onRefreshDefaults}
+              style={{
+                width: '100%',
+                fontSize: '0.8rem',
+                padding: '0.4rem',
+                background: 'rgba(255, 152, 0, 0.1)',
+                borderColor: '#ff9800',
+                color: '#ff9800'
+              }}
+              title="Refresh default calendars from CSV files (use after updating CSV files)"
+            >
+              🔄 Refresh Default Calendars from CSV
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -1,37 +1,20 @@
 import React from 'react';
 
 /**
- * Pure component for rendering a class schedule item in a calendar day.
- * This component has NO edit mode logic - it's purely presentational.
- * Used by the main calendar for read-only display.
+ * Component for rendering a class schedule item in a calendar day.
+ * Shows picked-up state when item is being moved.
  */
 const ClassScheduleDay = ({ 
   classScheduleItem, 
-  date, 
-  onDayClick 
+  date,
+  pickedUp = false
 }) => {
-  const handleClick = (e) => {
-    e.stopPropagation();
-    const rect = e.currentTarget.closest('.calendar-day').getBoundingClientRect();
-    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-    onDayClick(date, {
-      top: rect.top + scrollTop,
-      left: rect.left + scrollLeft,
-      width: rect.width,
-      height: rect.height
-    });
-  };
-
   return (
-    <div 
-      className="class-schedule-text"
-      onClick={handleClick}
-      style={{ 
-        cursor: 'pointer'
-      }}
+    <div
+      className={`class-schedule-chip${pickedUp ? ' picked' : ''}`}
+      title="Click a day to pick up / drop class schedule"
     >
-      {classScheduleItem.itemName}
+      {classScheduleItem.itemName || classScheduleItem.description}
     </div>
   );
 };
