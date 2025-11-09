@@ -3,7 +3,7 @@
   background: rgba(20, 20, 20, 0.95);
   border: 2px solid #444;
   border-radius: 8px;
-  z-index: 10000;
+  z-index: 99999 !important;
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
@@ -12,6 +12,7 @@
   color: #fff;
   min-width: 300px;
   min-height: 200px;
+  pointer-events: auto;
 }
 
 .debug-overlay-header {
@@ -113,5 +114,17 @@
 
 .debug-overlay-resize-handle:hover {
   background: linear-gradient(135deg, transparent 0%, transparent 40%, #888 40%, #888 60%, transparent 60%);
+}
+
+.debug-overlay-minimized {
+  min-width: auto !important;
+  min-height: auto !important;
+  width: 100% !important;
+  height: auto !important;
+}
+
+.debug-overlay-minimized .debug-overlay-header {
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
 }
 

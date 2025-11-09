@@ -782,85 +782,85 @@
   position: relative;
 }
 
-/* Full cell background colors for class schedule days */
+/* Full cell background colors for class schedule days - removed to make invisible */
 .calendar-day.class-schedule-day-quiz {
-  background: rgba(255, 152, 0, 0.3) !important;
-  border-left: 4px solid #ff9800;
+  background: transparent !important;
+  border-left: none;
 }
 
 .calendar-day.class-schedule-day-quiz:hover {
-  background: rgba(255, 152, 0, 0.4) !important;
-  box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+  background: transparent !important;
+  box-shadow: none;
 }
 
 .calendar-day.class-schedule-day-quiz .day-number {
-  color: #ffb74d;
-  font-weight: 700;
+  color: var(--text-main);
+  font-weight: normal;
 }
 
 .calendar-day.class-schedule-day-quiz .class-schedule-text {
-  color: #ffd54f;
-  font-weight: 600;
+  color: var(--text-main);
+  font-weight: normal;
 }
 
 .calendar-day.class-schedule-day-test {
-  background: rgba(244, 67, 54, 0.3) !important;
-  border-left: 4px solid #f44336;
+  background: transparent !important;
+  border-left: none;
 }
 
 .calendar-day.class-schedule-day-test:hover {
-  background: rgba(244, 67, 54, 0.4) !important;
-  box-shadow: 0 0 10px rgba(244, 67, 54, 0.5);
+  background: transparent !important;
+  box-shadow: none;
 }
 
 .calendar-day.class-schedule-day-test .day-number {
-  color: #ef5350;
-  font-weight: 700;
+  color: var(--text-main);
+  font-weight: normal;
 }
 
 .calendar-day.class-schedule-day-test .class-schedule-text {
-  color: #ffcdd2;
-  font-weight: 600;
+  color: var(--text-main);
+  font-weight: normal;
 }
 
 .calendar-day.class-schedule-day-exam {
-  background: rgba(156, 39, 176, 0.3) !important;
-  border-left: 4px solid #9c27b0;
+  background: transparent !important;
+  border-left: none;
 }
 
 .calendar-day.class-schedule-day-exam:hover {
-  background: rgba(156, 39, 176, 0.4) !important;
-  box-shadow: 0 0 10px rgba(156, 39, 176, 0.5);
+  background: transparent !important;
+  box-shadow: none;
 }
 
 .calendar-day.class-schedule-day-exam .day-number {
-  color: #ba68c8;
-  font-weight: 700;
+  color: var(--text-main);
+  font-weight: normal;
 }
 
 .calendar-day.class-schedule-day-exam .class-schedule-text {
-  color: #ce93d8;
-  font-weight: 700;
+  color: var(--text-main);
+  font-weight: normal;
 }
 
 .calendar-day.class-schedule-day-holiday {
-  background: rgba(255, 193, 7, 0.3) !important;
-  border-left: 4px solid #ffc107;
+  background: transparent !important;
+  border-left: none;
 }
 
 .calendar-day.class-schedule-day-holiday:hover {
-  background: rgba(255, 193, 7, 0.4) !important;
-  box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+  background: transparent !important;
+  box-shadow: none;
 }
 
 .calendar-day.class-schedule-day-holiday .day-number {
-  color: #ffd54f;
-  font-weight: 700;
+  color: var(--text-main);
+  font-weight: normal;
 }
 
 .calendar-day.class-schedule-day-holiday .class-schedule-text {
-  color: #fff9c4;
-  font-weight: 600;
+  color: var(--text-main);
+  font-weight: normal;
 }
 
 .day-assignments {
@@ -870,12 +870,24 @@
   gap: 3px;
   overflow: hidden;
   min-height: 0;
+  background: transparent !important;
+}
+
+/* Force all assignment items and their children to be transparent */
+.day-assignments .assignment-item,
+.day-assignments .assignment-item *,
+.assignment-item,
+.assignment-item * {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
 }
 
 /* Shrink text when there are multiple assignments */
 .day-assignments[data-count="2"] .assignment-item {
   font-size: 0.7rem;
-  padding: 3px 5px;
+  padding: 0;
 }
 
 .day-assignments[data-count="2"] .assignment-name {
@@ -888,7 +900,7 @@
 
 .day-assignments[data-count="3"] .assignment-item {
   font-size: 0.65rem;
-  padding: 2px 4px;
+  padding: 0;
 }
 
 .day-assignments[data-count="3"] .assignment-name {
@@ -923,7 +935,7 @@
 .day-assignments[data-count="6"] .assignment-item,
 .day-assignments[data-count="7"] .assignment-item {
   font-size: 0.6rem;
-  padding: 2px 3px;
+  padding: 0;
 }
 
 .day-assignments[data-count="4"] .assignment-name,
@@ -944,46 +956,49 @@
 
 .assignment-item {
   font-size: 0.75rem;
-  padding: 4px 6px;
-  background: rgba(0, 179, 255, 0.15);
-  border-left: 3px solid var(--accent-blue);
-  border-radius: 3px;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
   color: var(--text-main);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: none;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  display: inline-block;
+  width: 100%;
+  box-shadow: none !important;
 }
 
 .assignment-item:hover {
-  background: rgba(0, 179, 255, 0.25);
-  transform: translateX(2px);
-  box-shadow: 0 0 6px rgba(0, 179, 255, 0.3);
+  background: transparent;
+  transform: none;
+  box-shadow: none;
 }
 
 .assignment-item.has-due-date {
-  border-left-color: var(--accent-red);
-  background: rgba(255, 0, 85, 0.15);
+  border: none;
+  background: transparent;
 }
 
 .assignment-item.has-due-date:hover {
-  background: rgba(255, 0, 85, 0.25);
-  box-shadow: 0 0 6px rgba(255, 0, 85, 0.3);
+  background: transparent;
+  box-shadow: none;
 }
 
 .assignment-item.has-start-date {
-  border-left-color: var(--accent-blue);
+  border: none;
 }
 
 .assignment-item.draggable {
   cursor: grab;
   user-select: none;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: none;
 }
 
 .assignment-item.draggable:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(0, 179, 255, 0.4);
+  transform: none;
+  box-shadow: none;
 }
 
 .assignment-item.draggable:active {
@@ -991,14 +1006,14 @@
 }
 
 .assignment-item.dragging {
-  opacity: 0.3;
-  transform: scale(0.95);
+  opacity: 0.5;
+  transform: none;
   pointer-events: none;
 }
 
 .assignment-item.being-dragged {
-  opacity: 0.3;
-  transform: scale(0.95);
+  opacity: 0.5;
+  transform: none;
 }
 
 /* Class starts marker styling */
@@ -1021,70 +1036,70 @@
 
 /* Class schedule item styling - Quiz (Orange/Amber) */
 .assignment-item.class-schedule-item.class-schedule-quiz {
-  background: rgba(255, 152, 0, 0.2);
-  border-left: 3px solid #ff9800;
-  box-shadow: 0 0 4px rgba(255, 152, 0, 0.3);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .assignment-item.class-schedule-item.class-schedule-quiz:hover {
-  background: rgba(255, 152, 0, 0.3);
-  box-shadow: 0 0 8px rgba(255, 152, 0, 0.5);
+  background: transparent;
+  box-shadow: none;
 }
 
 .assignment-item.class-schedule-item.class-schedule-quiz .assignment-name {
-  color: #ffb74d;
-  font-weight: 600;
+  color: var(--text-main);
+  font-weight: normal;
 }
 
 /* Class schedule item styling - Test (Red) */
 .assignment-item.class-schedule-item.class-schedule-test {
-  background: rgba(244, 67, 54, 0.2);
-  border-left: 3px solid #f44336;
-  box-shadow: 0 0 4px rgba(244, 67, 54, 0.3);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .assignment-item.class-schedule-item.class-schedule-test:hover {
-  background: rgba(244, 67, 54, 0.3);
-  box-shadow: 0 0 8px rgba(244, 67, 54, 0.5);
+  background: transparent;
+  box-shadow: none;
 }
 
 .assignment-item.class-schedule-item.class-schedule-test .assignment-name {
-  color: #ef5350;
-  font-weight: 600;
+  color: var(--text-main);
+  font-weight: normal;
 }
 
 /* Class schedule item styling - Final Exam (Purple) */
 .assignment-item.class-schedule-item.class-schedule-exam {
-  background: rgba(156, 39, 176, 0.2);
-  border-left: 3px solid #9c27b0;
-  box-shadow: 0 0 4px rgba(156, 39, 176, 0.3);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .assignment-item.class-schedule-item.class-schedule-exam:hover {
-  background: rgba(156, 39, 176, 0.3);
-  box-shadow: 0 0 8px rgba(156, 39, 176, 0.5);
+  background: transparent;
+  box-shadow: none;
 }
 
 .assignment-item.class-schedule-item.class-schedule-exam .assignment-name {
-  color: #ba68c8;
-  font-weight: 700;
+  color: var(--text-main);
+  font-weight: normal;
 }
 
 /* Class schedule item styling - Holiday (Gold/Yellow) */
 .assignment-item.class-schedule-item.class-schedule-holiday {
-  background: rgba(255, 193, 7, 0.25);
-  border-left: 3px solid #ffc107;
-  box-shadow: 0 0 4px rgba(255, 193, 7, 0.4);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .assignment-item.class-schedule-item.class-schedule-holiday:hover {
-  background: rgba(255, 193, 7, 0.35);
-  box-shadow: 0 0 8px rgba(255, 193, 7, 0.6);
+  background: transparent;
+  box-shadow: none;
 }
 
 .assignment-item.class-schedule-item.class-schedule-holiday .assignment-name {
-  color: #ffd54f;
-  font-weight: 600;
+  color: var(--text-main);
+  font-weight: normal;
 }
 
 .assignment-name {

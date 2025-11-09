@@ -99,11 +99,11 @@ export const parseClassScheduleCsv = (csvContent) => {
     values.push(current.trim());
 
     if (values.length >= 2) {
-      // Parse date from format like "25-Aug-25" to ISO format "YYYY-MM-DD"
+      // Parse date from various formats to ISO format "YYYY-MM-DD"
       const dateStr = values[0] || '';
       let formattedDate = dateStr;
       
-      // Try to parse date in format "DD-MMM-YY" or "DD-MMM-YYYY"
+      // Try to parse date in format "DD-MMM-YY" or "DD-MMM-YYYY" (e.g., "25-Aug-25")
       const dateMatch = dateStr.match(/(\d+)-([A-Za-z]+)-(\d+)/);
       if (dateMatch) {
         const day = dateMatch[1].padStart(2, '0');
@@ -119,8 +119,18 @@ export const parseClassScheduleCsv = (csvContent) => {
         const month = monthMap[monthName] || '01';
         // Convert to ISO format (YYYY-MM-DD) for consistent date comparison
         formattedDate = `${year}-${month}-${day}`;
+      } else if (dateStr.includes('/')) {
+        // Handle M/D/YYYY format (e.g., "8/26/2025" or "9/2/2025")
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+          const [month, day, year] = parts.map(Number);
+          if (month && day && year) {
+            // Convert to ISO format (YYYY-MM-DD)
+            formattedDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          }
+        }
       } else {
-        // If already in MM-DD-YYYY format, convert to ISO using utility
+        // If already in MM-DD-YYYY format (with dashes), convert to ISO using utility
         formattedDate = normalizeClassScheduleDate(dateStr);
       }
 

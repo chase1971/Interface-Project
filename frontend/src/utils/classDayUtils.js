@@ -194,6 +194,7 @@ export const cascadeMoveItems = (items, sourceDateStr, targetDateStr, scheduleTy
       
       // Check if next date is already occupied by a different item (BEFORE we move targetItem there)
       // We need to find it by matching the date AND ensuring it's not the item we're moving, the target item, or a fixed item
+      // Save the nextItem BEFORE we modify anything, so we can find it later even after targetItem moves to the same date
       const nextItem = updatedItems.find(item => 
         item.type === 'classSchedule' && 
         item.date === nextDateStr && 
@@ -203,6 +204,9 @@ export const cascadeMoveItems = (items, sourceDateStr, targetDateStr, scheduleTy
         (item.itemName !== itemToMove.itemName && item.description !== itemToMove.description) &&
         (item.itemName !== targetItem.itemName && item.description !== targetItem.description)
       );
+      
+      // Save nextItem's unique identifier for later lookup
+      const nextItemId = nextItem ? (nextItem.itemName || nextItem.description) : null;
       
       // Also check if nextDateStr is a holiday (even if no item is there, we should skip it)
       const isNextDateHoliday = holidayDates.has(nextDateStr);
@@ -263,8 +267,9 @@ export const cascadeMoveItems = (items, sourceDateStr, targetDateStr, scheduleTy
         // If next date was occupied, recursively cascade that item forward
         if (nextItem) {
           const nextItemDescription = nextItem.description || nextItem.itemName;
-          const nextItemOriginalDate = nextItem.date; // Save before we modify anything
-          console.log('⚠ Next class day was occupied by:', nextItemDescription, 'at', nextItemOriginalDate, '- recursively cascading');
+          // After moving targetItem, nextItem is now at nextDateStr (same date as targetItem)
+          // We need to move nextItem to the next available class day
+          console.log('⚠ Next class day was occupied by:', nextItemDescription, '- recursively cascading');
           
           // The item that was on nextDateStr needs to move to the next class day AFTER nextDateStr
           const dayAfterNext = new Date(nextDateStr + 'T00:00:00');
@@ -273,25 +278,31 @@ export const cascadeMoveItems = (items, sourceDateStr, targetDateStr, scheduleTy
           
           if (nextNextClassDay) {
             const nextNextDateStr = nextNextClassDay.toISOString().split('T')[0];
-            console.log('→ Recursively cascading', nextItemDescription, 'from', nextItemOriginalDate, 'to', nextNextDateStr);
+            console.log('→ Recursively cascading', nextItemDescription, 'from', nextDateStr, 'to', nextNextDateStr);
             
-            // Find nextItem by its description since there might be multiple items at nextDateStr now
-            // Make sure it's not a fixed item
+            // Find nextItem by its unique identifier - it should now be at nextDateStr (same as targetItem)
+            // Make sure it's not a fixed item and it's not the targetItem or itemToMove
+            // Use the saved nextItemId to find it reliably
             const nextItemToCascade = updatedItems.find(item =>
               item.type === 'classSchedule' &&
-              (item.itemName === nextItem.itemName || item.description === nextItem.description) &&
-              item.date === nextItemOriginalDate &&
+              (item.itemName === nextItemId || item.description === nextItemId) &&
+              item.date === nextDateStr && // After moving targetItem, nextItem is at nextDateStr
               !isFixedItem(item) &&
               item !== targetItem &&
-              item !== itemToMove
+              item !== itemToMove &&
+              (item.itemName !== targetItem.itemName && item.description !== targetItem.description)
             );
             
             if (nextItemToCascade) {
-              // Recursively call cascadeMoveItems to move nextItem from its original date to nextNextDateStr
+              // Recursively call cascadeMoveItems to move nextItem from nextDateStr to nextNextDateStr
               // Pass the description to uniquely identify the item
-              return cascadeMoveItems(updatedItems, nextItemOriginalDate, nextNextDateStr, scheduleType, holidayDates, nextItemDescription);
+              return cascadeMoveItems(updatedItems, nextDateStr, nextNextDateStr, scheduleType, holidayDates, nextItemDescription);
             } else {
-              console.warn('❌ Could not find nextItem to cascade in updatedItems');
+              console.warn('❌ Could not find nextItem to cascade in updatedItems', {
+                nextItemDescription,
+                nextDateStr,
+                availableItems: updatedItems.filter(i => i.date === nextDateStr).map(i => ({ desc: i.description || i.itemName, isFixed: isFixedItem(i) }))
+              });
             }
           } else {
             console.warn('❌ Could not find next class day after', nextDateStr, 'for recursive cascade');

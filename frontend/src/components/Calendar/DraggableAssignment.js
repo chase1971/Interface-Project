@@ -34,8 +34,8 @@ const DraggableAssignment = ({
   }
 
   const handleMouseDown = (e) => {
-    // Class starts marker and class schedule items should not be draggable
-    if (assignment.isClassStartsMarker || assignment.isClassSchedule) {
+    // Class starts marker should not be draggable (but class schedule items can be dragged in edit mode)
+    if (assignment.isClassStartsMarker) {
       return;
     }
     
@@ -162,7 +162,7 @@ const DraggableAssignment = ({
 
   const handleContextMenu = (e) => {
     // Right click to edit time - cancel any pending drag
-    // Class schedule items cannot be edited
+    // Class schedule items and class starts markers cannot be edited
     if (isEditMode && onClick && !assignment.isClassSchedule && !assignment.isClassStartsMarker) {
       e.preventDefault();
       e.stopPropagation();
@@ -183,21 +183,25 @@ const DraggableAssignment = ({
   return (
     <div
       ref={elementRef}
-      className={`assignment-item ${isDueDate ? 'has-due-date' : ''} ${isStartDate ? 'has-start-date' : ''} ${isEditMode && !assignment.isClassStartsMarker && !assignment.isClassSchedule ? 'draggable' : ''} ${isDragging && isBeingDragged ? 'dragging' : ''} ${isBeingDragged ? 'being-dragged' : ''} ${assignment.isClassStartsMarker ? 'class-starts-marker' : ''} ${assignment.isClassSchedule ? 'class-schedule-item' : ''} ${assignment.classScheduleType === 'quiz' ? 'class-schedule-quiz' : ''} ${assignment.classScheduleType === 'test' ? 'class-schedule-test' : ''} ${assignment.classScheduleType === 'exam' ? 'class-schedule-exam' : ''} ${assignment.classScheduleType === 'holiday' ? 'class-schedule-holiday' : ''}`}
+      className={`assignment-item ${isDueDate ? 'has-due-date' : ''} ${isStartDate ? 'has-start-date' : ''} ${isEditMode && !assignment.isClassStartsMarker ? 'draggable' : ''} ${isDragging && isBeingDragged ? 'dragging' : ''} ${isBeingDragged ? 'being-dragged' : ''} ${assignment.isClassStartsMarker ? 'class-starts-marker' : ''} ${assignment.isClassSchedule ? 'class-schedule-item' : ''} ${assignment.classScheduleType === 'quiz' ? 'class-schedule-quiz' : ''} ${assignment.classScheduleType === 'test' ? 'class-schedule-test' : ''} ${assignment.classScheduleType === 'exam' ? 'class-schedule-exam' : ''} ${assignment.classScheduleType === 'holiday' ? 'class-schedule-holiday' : ''}`}
       title={displayText}
-      onMouseDown={assignment.isClassStartsMarker || assignment.isClassSchedule ? undefined : handleMouseDown}
-      onMouseMove={assignment.isClassStartsMarker || assignment.isClassSchedule ? undefined : handleMouseMove}
-      onMouseUp={assignment.isClassStartsMarker || assignment.isClassSchedule ? undefined : handleMouseUp}
-      onClick={assignment.isClassStartsMarker || assignment.isClassSchedule ? undefined : handleClick}
+      onMouseDown={assignment.isClassStartsMarker ? undefined : handleMouseDown}
+      onMouseMove={assignment.isClassStartsMarker ? undefined : handleMouseMove}
+      onMouseUp={assignment.isClassStartsMarker ? undefined : handleMouseUp}
+      onClick={assignment.isClassStartsMarker ? undefined : handleClick}
       onContextMenu={assignment.isClassStartsMarker || assignment.isClassSchedule ? undefined : handleContextMenu}
       style={{
-        cursor: isEditMode && !assignment.isClassStartsMarker && !assignment.isClassSchedule ? 'grab' : 'default',
+        cursor: isEditMode && !assignment.isClassStartsMarker ? 'grab' : 'default',
         userSelect: 'none',
         transform: (isDragging && isBeingDragged) ? 'scale(1.1) translateZ(0)' : (isPressed ? 'scale(1.05)' : 'scale(1)'),
         zIndex: (isDragging && isBeingDragged) ? 1000 : 'auto',
         position: (isDragging && isBeingDragged) ? 'relative' : 'static',
         transition: (isDragging && isBeingDragged) ? 'none' : 'transform 0.2s ease',
-        opacity: isBeingDragged ? undefined : 1 // Don't gray out if just picked up
+        opacity: isBeingDragged ? undefined : 1, // Don't gray out if just picked up
+        background: 'transparent',
+        border: 'none',
+        padding: 0,
+        boxShadow: 'none'
       }}
     >
       <div className="assignment-name">{assignment.itemName}</div>

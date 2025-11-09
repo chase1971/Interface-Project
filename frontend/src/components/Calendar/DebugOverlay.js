@@ -4,13 +4,43 @@ import { getDebugMode, toggleDebugMode } from '../../utils/debug';
 
 const DebugOverlay = () => {
   const [logs, setLogs] = useState([]);
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
+  const [isMinimized, setIsMinimized] = useState(() => {
+    // Check localStorage for minimized state
+    const saved = localStorage.getItem('debugOverlayMinimized');
+    return saved !== null ? saved === 'true' : false;
+  });
+  const [isVisible, setIsVisible] = useState(() => {
+    // Check localStorage for visibility state
+    const saved = localStorage.getItem('debugOverlayVisible');
+    return saved !== null ? saved === 'true' : true;
+  });
   const [debugEnabled, setDebugEnabled] = useState(() => getDebugMode());
-  const [position, setPosition] = useState({ x: 20, y: 20 });
+  const [position, setPosition] = useState(() => {
+    // Load position from localStorage
+    const saved = localStorage.getItem('debugOverlayPosition');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return { x: 20, y: 20 };
+      }
+    }
+    return { x: 20, y: 20 };
+  });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [size, setSize] = useState({ width: 500, height: 400 });
+  const [size, setSize] = useState(() => {
+    // Load size from localStorage
+    const saved = localStorage.getItem('debugOverlaySize');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return { width: 500, height: 400 };
+      }
+    }
+    return { width: 500, height: 400 };
+  });
   const [isResizing, setIsResizing] = useState(false);
   const overlayRef = useRef(null);
   const logsEndRef = useRef(null);
@@ -111,12 +141,46 @@ const DebugOverlay = () => {
     };
   }, []);
 
+  // Save visibility state to localStorage
+  useEffect(() => {
+    localStorage.setItem('debugOverlayVisible', String(isVisible));
+  }, [isVisible]);
+
+  // Save minimized state to localStorage
+  useEffect(() => {
+    localStorage.setItem('debugOverlayMinimized', String(isMinimized));
+  }, [isMinimized]);
+
+  // Keyboard shortcut to toggle visibility (Ctrl+Shift+D)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        setIsVisible(prev => !prev);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  // Save position to localStorage
+  useEffect(() => {
+    localStorage.setItem('debugOverlayPosition', JSON.stringify(position));
+  }, [position]);
+
+  // Save size to localStorage
+  useEffect(() => {
+    localStorage.setItem('debugOverlaySize', JSON.stringify(size));
+  }, [size]);
+
   // Auto-scroll to bottom when new logs arrive
   useEffect(() => {
-    if (logsEndRef.current && !isMinimized) {
+    if (logsEndRef.current && !isMinimized && isVisible) {
       logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [logs, isMinimized]);
+  }, [logs, isMinimized, isVisible]);
 
   const handleMouseDown = (e) => {
     if (e.target.classList.contains('debug-overlay-header')) {
@@ -187,22 +251,71 @@ const DebugOverlay = () => {
     }
   };
 
-  if (!isVisible) return null;
+  // If completely hidden, show a small restore button
+  if (!isVisible) {
+    return (
+      <button
+        onClick={() => setIsVisible(true)}
+        onMouseDown={(e) => e.stopPropagation()}
+        style={{
+          position: 'fixed',
+          bottom: '10px',
+          right: '10px',
+          zIndex: 99999,
+          padding: '8px 12px',
+          backgroundColor: '#0a5',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          pointerEvents: 'auto'
+        }}
+        title="Show Debug Logs (Ctrl+Shift+D)"
+      >
+        🔍 Debug
+      </button>
+    );
+  }
+
+  // When minimized, position at bottom of screen
+  const minimizedStyle = isMinimized ? {
+    left: '0',
+    right: '0',
+    top: 'auto',
+    bottom: '0',
+    width: '100%',
+    height: 'auto',
+    maxWidth: '100%',
+    maxHeight: 'none',
+    borderRadius: '8px 8px 0 0'
+  } : {
+    left: `${position.x}px`,
+    top: `${position.y}px`,
+    width: `${size.width}px`,
+    height: `${size.height}px`,
+    maxHeight: '90vh',
+    maxWidth: '90vw'
+  };
 
   return (
     <div
       ref={overlayRef}
-      className="debug-overlay"
+      className={`debug-overlay ${isMinimized ? 'debug-overlay-minimized' : ''}`}
       style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        width: isMinimized ? 'auto' : `${size.width}px`,
-        height: isMinimized ? 'auto' : `${size.height}px`
+        ...minimizedStyle,
+        zIndex: 99999
       }}
     >
       <div 
         className="debug-overlay-header"
-        onMouseDown={handleMouseDown}
+        onMouseDown={isMinimized ? undefined : handleMouseDown}
+        style={{
+          cursor: isMinimized ? 'pointer' : 'move',
+          borderRadius: isMinimized ? '8px 8px 0 0' : undefined
+        }}
       >
         <span>Debug Logs ({logs.length}) {debugEnabled ? '🟢' : '🔴'}</span>
         <div className="debug-overlay-controls">
@@ -216,12 +329,25 @@ const DebugOverlay = () => {
           >
             {debugEnabled ? 'ON' : 'OFF'}
           </button>
-          <button onClick={copyLogs} title="Copy logs">📋</button>
-          <button onClick={clearLogs} title="Clear logs">🗑️</button>
-          <button onClick={() => setIsMinimized(!isMinimized)} title="Minimize">
+          {!isMinimized && (
+            <>
+              <button onClick={copyLogs} title="Copy logs">📋</button>
+              <button onClick={clearLogs} title="Clear logs">🗑️</button>
+            </>
+          )}
+          <button 
+            onClick={() => setIsMinimized(!isMinimized)} 
+            title={isMinimized ? "Restore" : "Minimize to bottom"}
+          >
             {isMinimized ? '⬆️' : '⬇️'}
           </button>
-          <button onClick={() => setIsVisible(false)} title="Close">✕</button>
+          <button 
+            onClick={() => setIsVisible(false)} 
+            title="Close"
+            style={{ background: '#a00' }}
+          >
+            ✕
+          </button>
         </div>
       </div>
       {!isMinimized && (

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import "./Calendar.css";
 import mavericksLogo from "../assets/mavericks-logo.png";
@@ -225,6 +226,11 @@ function Calendar() {
 
   // Track if we just imported a calendar to prevent useEffect from clearing it
   const justImportedRef = useRef(false);
+  
+  // Ref to track picked up schedule item for mousemove handler (avoids stale closures)
+  const pickedUpScheduleItemRef = useRef(null);
+  // Ref to track if we should stop updating drag position (for immediate cleanup)
+  const shouldStopDragRef = useRef(false);
 
   // Save selected course and calendar mode to localStorage when they change
   useEffect(() => {
@@ -271,14 +277,50 @@ function Calendar() {
   }, [calendarMode, selectedCourse]); // Only depend on calendarMode and selectedCourse
   // Note: We check courseCalendars inside the effect using getCourseCalendar to avoid dependency issues
 
+  // Update ref whenever pickedUpScheduleItem changes
+  useEffect(() => {
+    pickedUpScheduleItemRef.current = pickedUpScheduleItem;
+    // Reset stop flag when item is picked up
+    if (pickedUpScheduleItem) {
+      shouldStopDragRef.current = false;
+    }
+  }, [pickedUpScheduleItem]);
+
   // Handle mouse move for ghost image
   useEffect(() => {
     if (!pickedUpScheduleItem || calendarMode !== 'class' || !isEditMode) {
-      setScheduleItemDragPosition(null);
+      // Clear position immediately when conditions aren't met
+      flushSync(() => {
+        setScheduleItemDragPosition(null);
+      });
+      // If we're not in edit mode or class mode, clear any stuck picked up items
+      if ((calendarMode !== 'class' || !isEditMode) && pickedUpScheduleItem) {
+        flushSync(() => {
+          setPickedUpScheduleItem(null);
+        });
+      }
       return;
     }
 
     const handleMouseMove = (e) => {
+      // Check if we should stop updating (immediate stop flag)
+      if (shouldStopDragRef.current) {
+        flushSync(() => {
+          setScheduleItemDragPosition(null);
+        });
+        // Remove event listener immediately to prevent further calls
+        document.removeEventListener('mousemove', handleMouseMove);
+        return;
+      }
+      // Check ref to see if item is still picked up (avoids stale closure issues)
+      if (!pickedUpScheduleItemRef.current) {
+        flushSync(() => {
+          setScheduleItemDragPosition(null);
+        });
+        // Remove event listener immediately to prevent further calls
+        document.removeEventListener('mousemove', handleMouseMove);
+        return;
+      }
       setScheduleItemDragPosition({
         x: e.clientX,
         y: e.clientY
@@ -287,7 +329,12 @@ function Calendar() {
 
     document.addEventListener('mousemove', handleMouseMove);
     return () => {
+      shouldStopDragRef.current = true; // Set stop flag on cleanup
       document.removeEventListener('mousemove', handleMouseMove);
+      // Clear position on cleanup immediately using flushSync
+      flushSync(() => {
+        setScheduleItemDragPosition(null);
+      });
     };
   }, [pickedUpScheduleItem, calendarMode, isEditMode]);
 
@@ -345,6 +392,11 @@ function Calendar() {
     if (calendarMode === 'class') {
       // Take a snapshot of current class schedule when entering edit mode
       setClassScheduleSnapshot(JSON.parse(JSON.stringify(classSchedule)));
+      // Clear any stuck picked up items when entering edit mode
+      shouldStopDragRef.current = true;
+      pickedUpScheduleItemRef.current = null;
+      setPickedUpScheduleItem(null);
+      setScheduleItemDragPosition(null);
     }
     handleEnterEditMode();
   };
@@ -357,6 +409,9 @@ function Calendar() {
       localStorage.setItem(scheduleKey, JSON.stringify(classSchedule));
       setClassScheduleSnapshot(null);
     }
+    // Clear any picked up items when exiting edit mode
+    setPickedUpScheduleItem(null);
+    setScheduleItemDragPosition(null);
     handleExitEditMode();
   };
 
@@ -393,7 +448,13 @@ function Calendar() {
     }
     
     const dateStr = date.toISOString().split('T')[0];
-    setPickedUpScheduleItem({ ...scheduleItem, sourceDate: dateStr });
+    // Store initial position in the picked up item so we can track if user actually dragged
+    const initialPosition = event ? { x: event.clientX, y: event.clientY } : null;
+    setPickedUpScheduleItem({ 
+      ...scheduleItem, 
+      sourceDate: dateStr,
+      initialDragPosition: initialPosition
+    });
     
     // Set initial drag position
     if (event) {
@@ -410,6 +471,11 @@ function Calendar() {
     
     if (!isEditMode || calendarMode !== 'class' || !pickedUpScheduleItem) {
       debugLog('Early return - conditions not met', { isEditMode, calendarMode, hasPickedUpItem: !!pickedUpScheduleItem });
+      // Clear state even on early return
+      shouldStopDragRef.current = true;
+      pickedUpScheduleItemRef.current = null;
+      setPickedUpScheduleItem(null);
+      setScheduleItemDragPosition(null);
       return;
     }
     
@@ -442,7 +508,7 @@ function Calendar() {
     // Create a working copy of class schedule first
     const updatedSchedule = [...classSchedule]; // Use spread to ensure new array reference
     
-    // Build holiday date set from class schedule items (holidays and final exams)
+    // Build holiday date set from class schedule items (holidays and final exams) for cascading logic
     const holidayDates = new Set();
     updatedSchedule.forEach(item => {
       const desc = item.description.toLowerCase();
@@ -466,8 +532,6 @@ function Calendar() {
         // Thanksgiving spans Nov 26-27, so add both dates
         if (desc.includes('thanksgiving')) {
           const [year, month, day] = item.date.split('-').map(Number);
-          const thanksgivingDate = new Date(year, month - 1, day);
-          // If Thanksgiving is on Nov 26 (Thursday), also add Nov 27 (Friday)
           if (month === 11 && day === 26) {
             holidayDates.add(`${year}-11-27`);
           }
@@ -477,15 +541,17 @@ function Calendar() {
     
     debugLog('Holiday dates set:', Array.from(holidayDates));
     
-    debugLog('Looking for item to move', { sourceDateStr, itemName: pickedUpScheduleItem.itemName, scheduleLength: updatedSchedule.length });
+    // Get the item name/description from picked up item (could be itemName or description)
+    const itemNameToMatch = pickedUpScheduleItem.itemName || pickedUpScheduleItem.description;
+    debugLog('Looking for item to move', { sourceDateStr, itemName: itemNameToMatch, scheduleLength: updatedSchedule.length });
     debugLog('Current schedule items:', updatedSchedule.map(i => ({ date: i.date, description: i.description })));
     
     // Find the item being moved by matching date and description
     const itemToMove = updatedSchedule.find(item => 
-      item.date === sourceDateStr && item.description === pickedUpScheduleItem.itemName
+      item.date === sourceDateStr && item.description === itemNameToMatch
     );
     if (!itemToMove) {
-      debugError('Could not find item to move', { sourceDateStr, itemName: pickedUpScheduleItem.itemName, availableItems: updatedSchedule.map(i => ({ date: i.date, description: i.description })) });
+      debugError('Could not find item to move', { sourceDateStr, itemName: itemNameToMatch, pickedUpItem: pickedUpScheduleItem, availableItems: updatedSchedule.map(i => ({ date: i.date, description: i.description })) });
       setPickedUpScheduleItem(null);
       setScheduleItemDragPosition(null);
       return;
@@ -521,8 +587,8 @@ function Calendar() {
         description: item.description,
         classScheduleType: itemType,
         isClassSchedule: true,
-        // Mark holidays and final exams as fixed so they can't be moved
-        isFixedHoliday: itemType === 'holiday' || itemType === 'exam'
+        // Allow all items to be moved (no restrictions)
+        isFixedHoliday: false
       };
     });
     
@@ -532,7 +598,7 @@ function Calendar() {
       // Target is empty - just move the item, no cascading
       debugLog('Target is empty - simple move, no cascading');
       cascadedItems = scheduleItemsForCascade.map(item => {
-        if (item.date === sourceDateStr && item.itemName === pickedUpScheduleItem.itemName) {
+        if (item.date === sourceDateStr && item.itemName === itemNameToMatch) {
           return { ...item, date: targetDateStr };
         }
         return item;
@@ -543,7 +609,8 @@ function Calendar() {
         itemsCount: scheduleItemsForCascade.length, 
         sourceDateStr, 
         targetDateStr, 
-        courseSchedule 
+        courseSchedule,
+        itemNameToMatch
       });
       
       cascadedItems = cascadeMoveItems(
@@ -551,7 +618,8 @@ function Calendar() {
         sourceDateStr,
         targetDateStr,
         courseSchedule,
-        holidayDates
+        holidayDates,
+        itemNameToMatch  // Pass the item description to uniquely identify the item
       );
     }
     
@@ -605,14 +673,43 @@ function Calendar() {
     // Force a state update with a new array reference
     setClassSchedule([...newClassSchedule]);
     
+    // Clear picked up item AFTER schedule update to ensure ghost disappears
+    // Set stop flag FIRST to immediately stop mousemove handler
+    shouldStopDragRef.current = true;
+    // Clear the ref so mousemove handler stops updating
+    pickedUpScheduleItemRef.current = null;
+    
+    // Clear state immediately using flushSync to force synchronous update
+    // This ensures the ghost preview disappears immediately
+    // Clear multiple times to ensure it sticks
+    flushSync(() => {
+      setPickedUpScheduleItem(null);
+      setScheduleItemDragPosition(null);
+    });
+    
+    // Also clear in next frame as backup
+    requestAnimationFrame(() => {
+      shouldStopDragRef.current = true;
+      pickedUpScheduleItemRef.current = null;
+      flushSync(() => {
+        setPickedUpScheduleItem(null);
+        setScheduleItemDragPosition(null);
+      });
+    });
+    
     // Don't save to localStorage here - wait for Save Changes button
     // Changes are saved when exiting edit mode via handleExitClassEditMode
     
-    // Clear picked up item
-    setPickedUpScheduleItem(null);
-    setScheduleItemDragPosition(null);
-    
-    debugLog('Drop completed successfully - state updated');
+    debugLog('Drop completed successfully - state updated', {
+      pickedUpScheduleItemCleared: true,
+      scheduleItemDragPositionCleared: true,
+      shouldStopDrag: shouldStopDragRef.current,
+      pickedUpScheduleItemRef: pickedUpScheduleItemRef.current,
+      actualState: {
+        pickedUpScheduleItem,
+        scheduleItemDragPosition
+      }
+    });
   };
 
   // Load calendar data for a specific course
@@ -732,21 +829,65 @@ function Calendar() {
     debugLog('═══════════════════════════════════════════════════════════');
     debugLog('🟢 STEP 3: COPYING DATA FROM DEFAULT CALENDAR');
     debugLog('═══════════════════════════════════════════════════════════');
+    debugLog('Default calendar structure:', {
+      hasAssignments: !!defaultCal.assignments,
+      assignmentCount: defaultCal.assignments?.length || 0,
+      hasClassSchedule: !!defaultCal.classSchedule,
+      classScheduleCount: defaultCal.classSchedule?.length || 0,
+      classScheduleType: Array.isArray(defaultCal.classSchedule) ? 'array' : typeof defaultCal.classSchedule
+    });
     
-    const importedAssignments = JSON.parse(JSON.stringify(defaultCal.assignments));
-    const importedClassSchedule = defaultCal.classSchedule 
+    if (!defaultCal.classSchedule) {
+      debugError('❌ WARNING: Default calendar has NO classSchedule property!');
+      debugError('Default calendar keys:', Object.keys(defaultCal));
+    }
+    
+    const importedAssignments = JSON.parse(JSON.stringify(defaultCal.assignments || []));
+    const rawClassSchedule = defaultCal.classSchedule 
       ? JSON.parse(JSON.stringify(defaultCal.classSchedule))
       : [];
     
+    // Normalize class schedule dates to ISO format (YYYY-MM-DD)
+    // Handle both M/D/YYYY and MM-DD-YYYY formats
+    const importedClassSchedule = rawClassSchedule.map(item => {
+      let date = item.date || '';
+      // If date is in M/D/YYYY format, convert to ISO
+      if (date.includes('/') && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        const parts = date.split('/');
+        if (parts.length === 3) {
+          const [month, day, year] = parts.map(Number);
+          if (month && day && year) {
+            date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            debugLog(`🔄 Normalized date from M/D/YYYY to ISO: ${item.date} -> ${date}`);
+          }
+        }
+      } else if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        // If not ISO format, use normalizeClassScheduleDate
+        date = normalizeClassScheduleDate(date);
+      }
+      return {
+        ...item,
+        date: date
+      };
+    });
+    
     debugLog(`📋 Copied ${importedAssignments.length} assignments`);
     debugLog(`📅 Copied ${importedClassSchedule.length} class schedule items`);
+    
+    if (importedClassSchedule.length === 0) {
+      debugError('❌ WARNING: No class schedule items were copied!');
+      debugError('Default calendar classSchedule value:', defaultCal.classSchedule);
+    }
     
     // Log first items for debugging
     if (importedAssignments.length > 0) {
       debugLog('📝 FIRST ASSIGNMENT:', importedAssignments[0].itemName);
     }
     if (importedClassSchedule.length > 0) {
-      debugLog('📚 FIRST CLASS SCHEDULE ITEM:', importedClassSchedule[0].description);
+      debugLog('📚 FIRST CLASS SCHEDULE ITEM:', importedClassSchedule[0]);
+      debugLog('📚 First class schedule date format:', importedClassSchedule[0].date);
+    } else {
+      debugError('❌ No class schedule items to log!');
     }
 
     return { importedAssignments, importedClassSchedule };
@@ -757,6 +898,15 @@ function Calendar() {
     debugLog('═══════════════════════════════════════════════════════════');
     debugLog('🟢 STEP 4: SAVING TO COURSE CALENDAR');
     debugLog('═══════════════════════════════════════════════════════════');
+    debugLog(`📌 Target course ID: ${courseId}`);
+    debugLog(`📦 Assignments to save: ${assignments.length}`);
+    debugLog(`📅 Class schedule items to save: ${classSchedule.length}`);
+    
+    // Validate courseId
+    if (!courseId) {
+      debugError('❌ Cannot save calendar - courseId is empty!');
+      throw new Error('Course ID is required to save calendar');
+    }
     
     // Save assignments to course calendars
     setCourseCalendar(courseId, {
@@ -775,6 +925,14 @@ function Calendar() {
     const scheduleKey = `classSchedule_${courseId}`;
     localStorage.setItem(scheduleKey, JSON.stringify(normalizedClassSchedule));
     debugLog(`✅ Saved ${normalizedClassSchedule.length} class schedule items to localStorage['${scheduleKey}']`);
+    
+    // Verify the save by reading it back
+    const savedCalendar = getCourseCalendar(courseId);
+    if (savedCalendar && savedCalendar.originalAssignments) {
+      debugLog(`✓ Verification: Calendar saved correctly for ${courseId} with ${savedCalendar.originalAssignments.length} assignments`);
+    } else {
+      debugError(`❌ Verification failed: Calendar not found for ${courseId} after save!`);
+    }
 
     return normalizedClassSchedule;
   };
@@ -810,60 +968,231 @@ function Calendar() {
 
   // Handle importing from default calendar
   const handleImportDefaultCalendar = (defaultCalendarId) => {
+    // Capture importingCourse value at the start to prevent closure issues
+    const targetCourseId = importingCourse;
+    
     debugLog('═══════════════════════════════════════════════════════════');
     debugLog('🟢 STEP 2: handleImportDefaultCalendar CALLED');
     debugLog('═══════════════════════════════════════════════════════════');
     debugLog('Default calendar ID:', defaultCalendarId);
-    debugLog('Importing into course:', importingCourse);
+    debugLog('Target course ID (captured):', targetCourseId);
+    debugLog('Current importingCourse state:', importingCourse);
+    debugLog('Current selectedCourse:', selectedCourse);
     debugLog('Timestamp:', new Date().toISOString());
+
+    // Validate that we have a target course
+    if (!targetCourseId) {
+      debugError('❌ No target course specified for import');
+      alert('Error: No course selected for import. Please try again.');
+      return;
+    }
 
     try {
       // Step 1: Validate
-      const defaultCal = validateDefaultCalendarImport(defaultCalendarId, importingCourse);
+      const defaultCal = validateDefaultCalendarImport(defaultCalendarId, targetCourseId);
       if (!defaultCal) return;
 
       // Step 2: Copy data
       const { importedAssignments, importedClassSchedule } = copyDefaultCalendarData(defaultCal);
 
-      // Step 3: Save to localStorage
+      // Step 3: Save to localStorage - ALWAYS use the captured targetCourseId
+      debugLog(`💾 Saving calendar to course: ${targetCourseId}`);
       const normalizedClassSchedule = saveImportedCalendar(
-        importingCourse,
+        targetCourseId,
         importedAssignments,
         importedClassSchedule
       );
 
-      // Step 4: Load into state if course matches
-      loadImportedCalendarIntoState(importingCourse, importedAssignments, normalizedClassSchedule);
+      // Step 4: Load into state if course matches - use captured targetCourseId
+      loadImportedCalendarIntoState(targetCourseId, importedAssignments, normalizedClassSchedule);
 
-      // Step 5: Close modal
+      // Step 5: Ensure selectedCourse matches the imported course
+      if (targetCourseId !== selectedCourse) {
+        debugLog(`⚠️ Selected course (${selectedCourse}) doesn't match imported course (${targetCourseId})`);
+        debugLog(`🔄 Updating selectedCourse to ${targetCourseId}`);
+        setSelectedCourse(targetCourseId);
+      }
+
+      // Step 6: Close modal
       setShowImportCalendar(false);
       setImportingCourse('');
       
       debugLog('═══════════════════════════════════════════════════════════');
       debugLog('🟢 STEP 8: IMPORT COMPLETE - MODAL CLOSING');
+      debugLog(`✅ Calendar imported into: ${targetCourseId}`);
       debugLog('═══════════════════════════════════════════════════════════');
     } catch (error) {
       debugError('═══════════════════════════════════════════════════════════');
       debugError('❌ ERROR DURING IMPORT');
       debugError('═══════════════════════════════════════════════════════════');
       debugError('Error:', error.message);
+      debugError('Target course:', targetCourseId);
       debugError('═══════════════════════════════════════════════════════════');
       alert('Error importing default calendar: ' + error.message);
     }
   };
 
+  // Helper function to load TTH default calendar
+  const loadTTHDefaultCalendar = () => {
+    // Check if TTH default calendar already exists and is complete
+    const existingTTH = getDefaultCalendar('default-college-algebra-tth-fall');
+    const hasTTHAssignments = existingTTH && existingTTH.assignments && existingTTH.assignments.length > 0;
+    const hasTTHClassSchedule = existingTTH && existingTTH.classSchedule && existingTTH.classSchedule.length > 0;
+    
+    // Check if class schedule dates are in the wrong format (M/D/YYYY instead of ISO)
+    const hasInvalidDates = existingTTH && existingTTH.classSchedule && existingTTH.classSchedule.some(item => {
+      const date = item.date || '';
+      // Check if date is in M/D/YYYY format (contains slash and not in ISO format)
+      return date.includes('/') && !/^\d{4}-\d{2}-\d{2}$/.test(date);
+    });
+    
+    debugLog('🔍 Checking default TTH calendar:', {
+      exists: !!existingTTH,
+      hasAssignments: hasTTHAssignments,
+      assignmentCount: existingTTH?.assignments?.length || 0,
+      hasClassSchedule: hasTTHClassSchedule,
+      classScheduleCount: existingTTH?.classSchedule?.length || 0,
+      hasInvalidDates: hasInvalidDates
+    });
+    
+    // If calendar exists and is complete with valid dates, we're done
+    if (hasTTHAssignments && hasTTHClassSchedule && !hasInvalidDates) {
+      debugLog('✓ Default TTH calendar already exists and is complete with valid dates');
+      return Promise.resolve();
+    }
+    
+    // If it exists but has invalid dates or is incomplete, remove it and reload from CSV
+    if (existingTTH) {
+      if (hasInvalidDates) {
+        debugLog('⚠️ Default TTH calendar has dates in wrong format - removing and reloading to fix');
+      } else {
+        debugLog('⚠️ Default TTH calendar exists but is incomplete - removing and reloading');
+      }
+      removeDefaultCalendar('default-college-algebra-tth-fall');
+    }
+
+    // Load both CSV files from public folder
+    const publicUrl = process.env.PUBLIC_URL || '';
+    const assignmentUrl = `${publicUrl}/Calendar/CA-TTH-Fall-Assignment-Calendar.csv`;
+    const classScheduleUrl = `${publicUrl}/Calendar/CA-TTH-Fall-Class-Calendar.csv`;
+    
+    return Promise.all([
+      fetch(assignmentUrl).then(r => {
+        if (!r.ok) throw new Error(`Failed to load TTH assignment calendar: ${r.status}`);
+        return r.text();
+      }),
+      fetch(classScheduleUrl).then(r => {
+        if (!r.ok) throw new Error(`Failed to load TTH class calendar: ${r.status}`);
+        return r.text();
+      })
+    ])
+      .then(([assignmentCsv, classScheduleCsv]) => {
+        debugLog('═══════════════════════════════════════════════════════════');
+        debugLog('🟢 LOADING DEFAULT TTH CALENDAR FROM CSV FILES');
+        debugLog('═══════════════════════════════════════════════════════════');
+        debugLog('TTH Assignment CSV first 3 lines:');
+        debugLog(assignmentCsv.split('\n').slice(0, 3).join('\n'));
+        debugLog('TTH Class Schedule CSV first 3 lines:');
+        debugLog(classScheduleCsv.split('\n').slice(0, 3).join('\n'));
+        
+        // Parse CSV files
+        const assignments = parseCsvFile(assignmentCsv);
+        const classScheduleItems = parseClassScheduleCsv(classScheduleCsv);
+        
+        debugLog(`✅ Parsed ${assignments.length} assignments from TTH Assignment CSV`);
+        debugLog(`✅ Parsed ${classScheduleItems.length} class schedule items from TTH Class Schedule CSV`);
+        
+        // Validate CSV files and parsed data
+        const validation = validateCsvFiles(assignmentCsv, classScheduleCsv, assignments, classScheduleItems);
+        if (!validation.valid) {
+          debugError('❌ TTH CSV VALIDATION FAILED:');
+          validation.errors.forEach(error => debugError(`  ${error}`));
+          throw new Error(validation.errors.join('; '));
+        }
+        
+        debugLog('✅ All TTH CSV files validated successfully');
+        
+        // Convert class schedule to the format expected by the app
+        // parseClassScheduleCsv should already convert dates to ISO format (YYYY-MM-DD)
+        // But we'll ensure they're normalized just to be safe
+        const classSchedule = classScheduleItems.map(item => {
+          let date = item.date;
+          // If date is still in M/D/YYYY format (shouldn't happen, but double-check), convert it
+          if (date.includes('/') && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            const parts = date.split('/');
+            if (parts.length === 3) {
+              const [month, day, year] = parts.map(Number);
+              if (month && day && year) {
+                date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                debugLog(`🔄 Converted date from M/D/YYYY to ISO: ${item.date} -> ${date}`);
+              }
+            }
+          } else if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            // If not ISO format, use normalizeClassScheduleDate
+            date = normalizeClassScheduleDate(date);
+          }
+          return {
+            date: date,
+            description: item.description,
+            type: 'classSchedule'
+          };
+        });
+        
+        // Log first few dates to verify they're in ISO format
+        if (classSchedule.length > 0) {
+          debugLog('📅 First 3 TTH class schedule dates (should be ISO format):', classSchedule.slice(0, 3).map(item => item.date));
+        }
+
+        addDefaultCalendar({
+          id: 'default-college-algebra-tth-fall',
+          name: 'Default College Algebra Tuesday, Thursday Fall Semester',
+          courseType: 'College Algebra',
+          schedule: 'Tuesday, Thursday',
+          semester: 'Fall',
+          assignments: assignments,
+          classSchedule: classSchedule
+        });
+
+        // Verify the default calendar was saved correctly
+        const savedTTH = getDefaultCalendar('default-college-algebra-tth-fall');
+        if (savedTTH) {
+          debugLog(`✅ Default TTH calendar saved: ${savedTTH.assignments?.length || 0} assignments, ${savedTTH.classSchedule?.length || 0} class schedule items`);
+        } else {
+          debugError('❌ Failed to verify default TTH calendar was saved!');
+        }
+      })
+      .catch(err => {
+        debugError('❌ Failed to load TTH CSV files for default calendar:', err);
+        // Don't throw - allow MW calendar to work even if TTH fails
+      });
+  };
+
   // Initialize default calendar - load from CSV files
   useEffect(() => {
-    // Check if default calendar already exists
+    // Check if default calendar already exists and is complete
     const existingDefault = getDefaultCalendar('default-college-algebra-mw-fall');
-    if (existingDefault && existingDefault.assignments && existingDefault.assignments.length > 0 && 
-        existingDefault.classSchedule && existingDefault.classSchedule.length > 0) {
+    const hasAssignments = existingDefault && existingDefault.assignments && existingDefault.assignments.length > 0;
+    const hasClassSchedule = existingDefault && existingDefault.classSchedule && existingDefault.classSchedule.length > 0;
+    
+    debugLog('🔍 Checking default MW calendar:', {
+      exists: !!existingDefault,
+      hasAssignments: hasAssignments,
+      assignmentCount: existingDefault?.assignments?.length || 0,
+      hasClassSchedule: hasClassSchedule,
+      classScheduleCount: existingDefault?.classSchedule?.length || 0
+    });
+    
+    if (hasAssignments && hasClassSchedule) {
       // Already exists with both assignments and class schedule - done
+      debugLog('✓ Default MW calendar already exists and is complete');
+      // Still load TTH calendar even if MW is already loaded
+      loadTTHDefaultCalendar();
       return;
     }
     
     // If it exists but is incomplete, remove it and reload from CSV
     if (existingDefault) {
+      debugLog('⚠️ Default MW calendar exists but is incomplete - removing and reloading');
       removeDefaultCalendar('default-college-algebra-mw-fall');
       localStorage.removeItem('defaultCalendarsInitialized');
     }
@@ -927,7 +1256,19 @@ function Calendar() {
           classSchedule: classSchedule
         });
 
+        // Verify the default calendar was saved correctly
+        const savedDefault = getDefaultCalendar('default-college-algebra-mw-fall');
+        if (savedDefault) {
+          debugLog(`✅ Default MW calendar saved: ${savedDefault.assignments?.length || 0} assignments, ${savedDefault.classSchedule?.length || 0} class schedule items`);
+        } else {
+          debugError('❌ Failed to verify default MW calendar was saved!');
+        }
+
         localStorage.setItem('defaultCalendarsInitialized', 'true');
+      })
+      .then(() => {
+        // After MW calendar is loaded, load TTH calendar
+        return loadTTHDefaultCalendar();
       })
       .catch(err => {
         debugError('❌ Failed to load CSV files for default calendar:', err);
@@ -1235,7 +1576,23 @@ function Calendar() {
 
   // Handle day click for expanded modal
   const handleDayClick = (date, position) => {
-    openExpandedModal(date, position);
+    // Don't open expanded modal in edit mode (drag operations take priority)
+    if (isEditMode) {
+      return;
+    }
+    
+    // Don't open expanded modal in class calendar mode
+    // Class calendars only have one item per date, so no need for expanded view
+    if (calendarMode === 'class') {
+      return;
+    }
+    
+    // Check if there are multiple items on this date
+    const itemsForDate = getAssignmentsForDate(date);
+    // Only open modal if there are 2+ items (multiple assignments on same date)
+    if (itemsForDate && itemsForDate.length > 1) {
+      openExpandedModal(date, position);
+    }
   };
 
   // Handle assignment click (edit time)
@@ -1516,16 +1873,54 @@ function Calendar() {
                 pickedUpAssignment={pickedUpAssignment}
                 dragPosition={dragPosition}
                 dragStartPosition={dragStartPosition}
-                onAssignmentDragStart={handleAssignmentDragStart}
+                onAssignmentDragStart={(e, assignment, position, options) => {
+                  // Check if this is a class schedule item
+                  const isClassScheduleItem = assignment && assignment.isClassSchedule;
+                  
+                  if (isClassScheduleItem && calendarMode === 'class') {
+                    // For class schedule items, find the item in classSchedule by matching date and description
+                    // The assignment's date property should match the class schedule item's date
+                    const assignmentDate = assignment.date || assignment.startDate || assignment.dueDate;
+                    const dateStr = assignmentDate ? (typeof assignmentDate === 'string' ? assignmentDate : assignmentDate.toISOString().split('T')[0]) : null;
+                    
+                    if (dateStr) {
+                      // Find the class schedule item from classSchedule state
+                      const scheduleItem = classSchedule.find(item => 
+                        item.date === dateStr && item.description === assignment.itemName
+                      );
+                      if (scheduleItem) {
+                        const date = new Date(dateStr);
+                        handleScheduleItemPickup(date, scheduleItem, e);
+                      }
+                    }
+                  } else {
+                    // Use regular assignment drag start handler
+                    handleAssignmentDragStart(e, assignment, position, options);
+                  }
+                }}
                 onAssignmentDragMove={handleAssignmentDragMove}
-                onAssignmentDrop={handleAssignmentDrop}
+                onAssignmentDrop={(assignment, targetDate) => {
+                  // Check if this is a class schedule item
+                  const isClassScheduleItem = assignment && (
+                    assignment.isClassSchedule || 
+                    (typeof assignment === 'object' && assignment.assignment && assignment.assignment.isClassSchedule)
+                  );
+                  
+                  if (isClassScheduleItem && calendarMode === 'class') {
+                    // Use class schedule drop handler
+                    handleScheduleItemDrop(targetDate);
+                  } else {
+                    // Use regular assignment drop handler
+                    handleAssignmentDrop(assignment, targetDate);
+                  }
+                }}
                 onAssignmentClick={handleAssignmentClick}
                 calendarMode={calendarMode}
-                // Class calendar edit mode is handled on separate page, not here
-                pickedUpScheduleItem={null}
-                scheduleItemDragPosition={null}
-                onScheduleItemPickup={undefined}
-                onScheduleItemDrop={undefined}
+                classSchedule={classSchedule}
+                pickedUpScheduleItem={pickedUpScheduleItem}
+                scheduleItemDragPosition={scheduleItemDragPosition}
+                onScheduleItemPickup={handleScheduleItemPickup}
+                onScheduleItemDrop={handleScheduleItemDrop}
               />
             </>
           )}
