@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { parseDate, getDaysInMonth, dayNames } from '../../utils/calendarUtils';
+import { parseDate, getDaysInMonth, dayNames, isFixedItem } from '../../utils/calendarUtils';
 import { debugLog } from '../../utils/debug';
 import DraggableAssignment from './DraggableAssignment';
 import ClassScheduleDay from './ClassScheduleDay';
@@ -26,7 +26,13 @@ const CalendarGrid = ({
   onScheduleItemDrop,
   onPushForward,
   onPushBack,
-  courseSchedule
+  courseSchedule,
+  editingDate,
+  editingValue,
+  onDayRightClick,
+  onAddClassScheduleItem,
+  onEditingValueChange,
+  onCancelEditing
 }) => {
   const [dragOverDate, setDragOverDate] = useState(null);
   const [selectedEmptyDate, setSelectedEmptyDate] = useState(null);
@@ -193,10 +199,18 @@ const CalendarGrid = ({
       classScheduleItem &&
       classScheduleItem.itemName === (pickedUpScheduleItem.itemName || pickedUpScheduleItem.description);
 
+    // Check if this date is being edited
+    const isEditing = editingDate && editingDate.toDateString() === date.toDateString();
+    
     days.push(
       <div
         key={day}
-        className={`calendar-day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''} ${isDragOver && isEditMode ? 'drag-over' : ''} ${hasPickedUpItem ? 'picked-up' : ''} ${scheduleType === 'quiz' ? 'class-schedule-day-quiz' : ''} ${scheduleType === 'test' ? 'class-schedule-day-test' : ''} ${scheduleType === 'exam' ? 'class-schedule-day-exam' : ''} ${scheduleType === 'holiday' ? 'class-schedule-day-holiday' : ''}`}
+        className={`calendar-day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''} ${isDragOver && isEditMode ? 'drag-over' : ''} ${hasPickedUpItem ? 'picked-up' : ''} ${scheduleType === 'quiz' ? 'class-schedule-day-quiz' : ''} ${scheduleType === 'test' ? 'class-schedule-day-test' : ''} ${scheduleType === 'exam' ? 'class-schedule-day-exam' : ''} ${scheduleType === 'holiday' ? 'class-schedule-day-holiday' : ''} ${isEditing ? 'editing' : ''}`}
+        onContextMenu={(e) => {
+          if (isEditMode && calendarMode === 'class' && onDayRightClick) {
+            onDayRightClick(date, e);
+          }
+        }}
         onClick={(e) => {
           e.stopPropagation();
           
@@ -344,7 +358,57 @@ const CalendarGrid = ({
             pointerEvents: dateAssignments.length === 0 ? 'none' : 'auto'
           }}
         >
-          {dateAssignments.slice(0, 1).map((assignment, idx) => {
+          {/* Right-click editing input */}
+          {isEditing && isEditMode && calendarMode === 'class' && (
+            <input
+              type="text"
+              value={editingValue}
+              onChange={(e) => {
+                if (onEditingValueChange) {
+                  onEditingValueChange(e.target.value);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (onAddClassScheduleItem) {
+                    onAddClassScheduleItem(date, editingValue);
+                  }
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (onCancelEditing) {
+                    onCancelEditing();
+                  }
+                }
+              }}
+              onBlur={() => {
+                // Auto-save on blur (even if empty, to allow deletion)
+                if (onAddClassScheduleItem) {
+                  onAddClassScheduleItem(date, editingValue);
+                } else if (onCancelEditing) {
+                  onCancelEditing();
+                }
+              }}
+              autoFocus
+              style={{
+                width: '100%',
+                padding: '4px 8px',
+                fontSize: '12px',
+                border: '2px solid var(--accent-blue)',
+                borderRadius: '4px',
+                background: 'rgba(13, 17, 23, 0.95)',
+                color: 'var(--text-primary)',
+                outline: 'none',
+                zIndex: 1000,
+                position: 'relative'
+              }}
+              placeholder="Type item name..."
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
+          {!isEditing && dateAssignments.slice(0, 1).map((assignment, idx) => {
             // Render class schedule items with ClassScheduleDay component
             if (assignment.isClassSchedule && calendarMode === 'class') {
               const dateStr = date.toISOString().split('T')[0];
@@ -403,7 +467,7 @@ const CalendarGrid = ({
               />
             );
           })}
-          {dateAssignments.length > 1 && (
+          {!isEditing && dateAssignments.length > 1 && (
             <div 
               className="assignment-more"
               onClick={(e) => {

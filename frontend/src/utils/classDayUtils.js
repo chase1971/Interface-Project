@@ -161,6 +161,49 @@ export const findPreviousClassDay = (date, scheduleType, holidayDates = new Set(
 };
 
 /**
+ * Checks if a given date is a class day for the specified schedule
+ * @param {Date|string} date - The date to check
+ * @param {string} scheduleType - Schedule type ('MW' or 'TR')
+ * @param {Set} holidayDates - Set of holiday date strings to skip
+ * @returns {boolean} - True if the date is a class day, false otherwise
+ */
+export const isClassDay = (date, scheduleType, holidayDates = new Set()) => {
+  if (!date || !scheduleType) return false;
+  
+  const dateObj = typeof date === 'string'
+    ? (() => {
+        const [y, m, d] = date.split('-').map(Number);
+        return new Date(y, m - 1, d);
+      })()
+    : new Date(date);
+  
+  dateObj.setHours(0, 0, 0, 0);
+  
+  // Determine target days for schedule
+  let day1, day2;
+  if (scheduleType === 'MW') {
+    day1 = 1; // Monday
+    day2 = 3; // Wednesday
+  } else if (scheduleType === 'TR') {
+    day1 = 2; // Tuesday
+    day2 = 4; // Thursday
+  } else {
+    return false;
+  }
+  
+  const dayOfWeek = dateObj.getDay();
+  const dateStr = dateObj.toISOString().split('T')[0];
+  
+  // Check if it's a holiday
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const isThanksgiving = (month === 11 && (day === 26 || day === 27));
+  const isHoliday = holidayDates.has(dateStr) || isThanksgiving;
+  
+  // Return true if it's a class day and not a holiday
+  return (dayOfWeek === day1 || dayOfWeek === day2) && !isHoliday;
+};
+
+/**
  * Cascades items when moving an item to a new date
  * @param {Array} items - Array of calendar items
  * @param {string} sourceDateStr - Source date (YYYY-MM-DD)
