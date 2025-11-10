@@ -91,6 +91,9 @@ function Calendar() {
   const [showClearCalendarMenu, setShowClearCalendarMenu] = useState(false);
   const [clearDateRange, setClearDateRange] = useState({ start: null, end: null, label: '' });
   
+  // Calendar Options menu state
+  const [showCalendarOptionsMenu, setShowCalendarOptionsMenu] = useState(false);
+  
   // Import calendar state (non-modal state stays here)
   const [importingCourse, setImportingCourse] = useState('');
   const [importStartDate, setImportStartDate] = useState('');
@@ -2193,56 +2196,52 @@ function Calendar() {
           setShowImportCalendar(true);
         }}
         onSemesterClick={goToSemester}
+        showCalendarOptionsMenu={showCalendarOptionsMenu}
+        onCalendarOptionsToggle={() => setShowCalendarOptionsMenu(!showCalendarOptionsMenu)}
+        onFuturePlanningClick={() => {
+          navigate('/future-planning');
+          setShowCalendarOptionsMenu(false);
+        }}
+        onClearCalendarClick={(e) => {
+          e.stopPropagation();
+          setShowClearCalendarMenu(!showClearCalendarMenu);
+          setSelectedSemester('');
+          setShowCalendarOptionsMenu(false);
+        }}
+        showClearCalendarMenu={showClearCalendarMenu}
+        selectedSemester={selectedSemester}
+        clearDateRange={clearDateRange}
+        originalAssignments={originalAssignments}
+        acceptedFutureAssignments={acceptedFutureAssignments}
+        onSemesterSelect={handleSemesterSelect}
+        onClearCalendarClose={() => {
+          setShowClearCalendarMenu(false);
+          setSelectedSemester('');
+        }}
+        onClearCalendarConfirm={confirmClearSemester}
+        onClearCalendarCancel={() => {
+          setShowClearConfirmation(false);
+          setSelectedSemester('');
+          setClearDateRange({ start: null, end: null, label: '' });
+        }}
+        showClearConfirmation={showClearConfirmation}
       />
 
       <div className="calendar-main-wrapper">
         <header className="calendar-header">
           <div className="header-buttons-left">
-            <button className="future-planning-button" onClick={() => {
-              navigate('/future-planning');
-            }}>
-              Future Planning
-            </button>
-            <div style={{ position: 'relative' }}>
-              <button className="clear-calendar-button" onClick={(e) => {
-                e.stopPropagation();
-                setShowClearCalendarMenu(!showClearCalendarMenu);
-              setSelectedSemester('');
-            }}>
-              Clear Calendar
-            </button>
-              {showClearCalendarMenu && (
-                <ClearCalendarModal
-                  show={showClearCalendarMenu}
-                  showConfirmation={showClearConfirmation}
-                  selectedSemester={selectedSemester}
-                  clearDateRange={clearDateRange}
-                  originalAssignments={originalAssignments}
-                  acceptedFutureAssignments={acceptedFutureAssignments}
-                  selectedCourse={selectedCourse}
-                  onClose={() => {
-                    setShowClearCalendarMenu(false);
-                    setSelectedSemester('');
-                  }}
-                  onSemesterSelect={handleSemesterSelect}
-                  onConfirm={confirmClearSemester}
-                  onCancel={() => {
-                    setShowClearConfirmation(false);
-                    setSelectedSemester('');
-                    setClearDateRange({ start: null, end: null, label: '' });
-                  }}
-                />
-              )}
-            </div>
             <button 
-              className="calendar-mode-toggle-button" 
+              className="calendar-mode-toggle-button-large" 
               onClick={() => {
                 setCalendarMode(calendarMode === 'assignment' ? 'class' : 'assignment');
               }}
               style={{
                 background: calendarMode === 'class' ? 'rgba(76, 175, 80, 0.2)' : 'rgba(0, 179, 255, 0.1)',
                 borderColor: calendarMode === 'class' ? '#4caf50' : 'var(--accent-blue)',
-                color: calendarMode === 'class' ? '#4caf50' : 'var(--accent-blue)'
+                color: calendarMode === 'class' ? '#4caf50' : 'var(--accent-blue)',
+                fontFamily: 'var(--font-primary)',
+                fontSize: '1rem',
+                fontWeight: '600'
               }}
             >
               {calendarMode === 'assignment' ? '📚 Class Calendar' : '📝 Assignment Calendar'}
@@ -2262,6 +2261,30 @@ function Calendar() {
             ← Back to Home
           </button>
         </header>
+        
+        {/* Clear Calendar Modal - moved here since it's triggered from Calendar Options */}
+        {showClearCalendarMenu && (
+          <ClearCalendarModal
+            show={showClearCalendarMenu}
+            showConfirmation={showClearConfirmation}
+            selectedSemester={selectedSemester}
+            clearDateRange={clearDateRange}
+            originalAssignments={originalAssignments}
+            acceptedFutureAssignments={acceptedFutureAssignments}
+            selectedCourse={selectedCourse}
+            onClose={() => {
+              setShowClearCalendarMenu(false);
+              setSelectedSemester('');
+            }}
+            onSemesterSelect={handleSemesterSelect}
+            onConfirm={confirmClearSemester}
+            onCancel={() => {
+              setShowClearConfirmation(false);
+              setSelectedSemester('');
+              setClearDateRange({ start: null, end: null, label: '' });
+            }}
+          />
+        )}
 
         {/* Pending Changes Banner */}
         {hasPendingChanges && offsetAssignments.length > 0 && (

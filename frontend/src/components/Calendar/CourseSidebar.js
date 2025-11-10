@@ -1,7 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import ClearCalendarModal from './ClearCalendarModal';
 
-const CourseSidebar = ({ courses, selectedCourse, courseCalendars, onCourseSelect, onImportClick, onSemesterClick }) => {
+const CourseSidebar = ({ 
+  courses, 
+  selectedCourse, 
+  courseCalendars, 
+  onCourseSelect, 
+  onImportClick, 
+  onSemesterClick,
+  showCalendarOptionsMenu,
+  onCalendarOptionsToggle,
+  onFuturePlanningClick,
+  onClearCalendarClick,
+  showClearCalendarMenu,
+  selectedSemester,
+  clearDateRange,
+  originalAssignments,
+  acceptedFutureAssignments,
+  onSemesterSelect,
+  onClearCalendarClose,
+  onClearCalendarConfirm,
+  onClearCalendarCancel,
+  showClearConfirmation,
+  selectedCourse: selectedCourseForClear
+}) => {
   const [isSemesterMenuOpen, setIsSemesterMenuOpen] = useState(false);
+  const [calendarOptionsMenuTop, setCalendarOptionsMenuTop] = useState(50);
+  const calendarOptionsButtonRef = useRef(null);
+
+  // Update menu position when it opens or when semesters menu state changes
+  useEffect(() => {
+    if (showCalendarOptionsMenu && calendarOptionsButtonRef.current) {
+      const rect = calendarOptionsButtonRef.current.getBoundingClientRect();
+      setCalendarOptionsMenuTop(rect.top);
+    }
+  }, [showCalendarOptionsMenu, isSemesterMenuOpen]);
 
   const getSemesterButtons = () => {
     const now = new Date();
@@ -91,6 +124,54 @@ const CourseSidebar = ({ courses, selectedCourse, courseCalendars, onCourseSelec
                     {btn.label}
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="calendar-options-button-wrapper" ref={calendarOptionsButtonRef}>
+          <button 
+            className="calendar-options-toggle-button"
+            onClick={onCalendarOptionsToggle}
+          >
+            {showCalendarOptionsMenu ? '▼ Calendar Options' : '▶ Calendar Options'}
+          </button>
+          {showCalendarOptionsMenu && (
+            <div 
+              className={`calendar-options-menu ${isSemesterMenuOpen ? 'below-semesters' : ''}`}
+              style={{
+                top: `${calendarOptionsMenuTop}px`
+              }}
+            >
+              <div className="calendar-options-menu-buttons">
+                <button
+                  className="calendar-options-menu-button"
+                  onClick={onFuturePlanningClick}
+                >
+                  Future Planning
+                </button>
+                <div style={{ position: 'relative' }}>
+                  <button
+                    className="calendar-options-menu-button"
+                    onClick={onClearCalendarClick}
+                  >
+                    Clear Calendar
+                  </button>
+                  {showClearCalendarMenu && (
+                    <ClearCalendarModal
+                      show={showClearCalendarMenu}
+                      showConfirmation={showClearConfirmation}
+                      selectedSemester={selectedSemester}
+                      clearDateRange={clearDateRange}
+                      originalAssignments={originalAssignments}
+                      acceptedFutureAssignments={acceptedFutureAssignments}
+                      selectedCourse={selectedCourseForClear}
+                      onClose={onClearCalendarClose}
+                      onSemesterSelect={onSemesterSelect}
+                      onConfirm={onClearCalendarConfirm}
+                      onCancel={onClearCalendarCancel}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           )}
