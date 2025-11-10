@@ -680,6 +680,30 @@ export const normalizeDate = (date) => {
   return normalized;
 };
 
+// Convert Date object to ISO date string (YYYY-MM-DD)
+// Handles Date objects, date strings, and null/undefined
+export const dateToISOString = (date) => {
+  if (!date) return null;
+  
+  // If already a string in ISO format, return it
+  if (typeof date === 'string') {
+    // Check if it's already in YYYY-MM-DD format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return date;
+    }
+    // Try to parse it first
+    const parsed = parseDate(date);
+    return parsed ? parsed.toISOString().split('T')[0] : date;
+  }
+  
+  // If it's a Date object, convert to ISO string
+  if (date instanceof Date) {
+    return date.toISOString().split('T')[0];
+  }
+  
+  return null;
+};
+
 // Get the start date of the current semester based on a given date
 export const getSemesterStartDate = (date) => {
   const year = date.getFullYear();

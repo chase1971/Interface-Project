@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import "./Calendar.css";
 import mavericksLogo from "../assets/mavericks-logo.png";
@@ -37,7 +36,8 @@ import {
   getCourseSchedule,
   normalizeClassScheduleDate,
   isFixedItem,
-  getClassScheduleItemType
+  getClassScheduleItemType,
+  dateToISOString
 } from "../utils/calendarUtils";
 import { validateCsvFiles } from "../utils/csvValidation";
 import { cascadeMoveItems, findNextClassDay, findPreviousClassDay, isClassDay } from "../utils/classDayUtils";
@@ -412,7 +412,7 @@ function Calendar() {
       return;
     }
     
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = dateToISOString(date);
     setPickedUpScheduleItem({ 
       ...scheduleItem, 
       sourceDate: dateStr
@@ -433,8 +433,8 @@ function Calendar() {
     }
     
     // Format dates consistently - use YYYY-MM-DD format
-    const targetDateObj = new Date(targetDate);
-    const targetDateStr = targetDateObj.toISOString().split('T')[0];
+    const targetDateObj = targetDate instanceof Date ? targetDate : new Date(targetDate);
+    const targetDateStr = dateToISOString(targetDate);
     const sourceDateStr = pickedUpScheduleItem.sourceDate;
     
     debugLog('Drop attempt', { sourceDateStr, targetDateStr, targetDate });
@@ -636,24 +636,12 @@ function Calendar() {
     setClassSchedule([...newClassSchedule]);
     
     // Clear picked up item AFTER schedule update to ensure ghost disappears
-    // Set stop flag FIRST to immediately stop mousemove handler
+    // Set stop flag FIRST to immediately stop mousemove handler (refs are synchronous)
     shouldStopDragRef.current = true;
-    // Clear the ref so mousemove handler stops updating
     pickedUpScheduleItemRef.current = null;
     
-    // Clear state immediately using flushSync to force synchronous update
-    flushSync(() => {
-      setPickedUpScheduleItem(null);
-    });
-    
-    // Also clear in next frame as backup
-    requestAnimationFrame(() => {
-      shouldStopDragRef.current = true;
-      pickedUpScheduleItemRef.current = null;
-      flushSync(() => {
-        setPickedUpScheduleItem(null);
-      });
-    });
+    // Clear state - React will batch this update, which is fine since refs already stop the drag
+    setPickedUpScheduleItem(null);
     
     // Don't save to localStorage here - wait for Save Changes button
     // Changes are saved when exiting edit mode via handleExitClassEditMode
@@ -669,7 +657,7 @@ function Calendar() {
   const handlePushForward = (emptyDate) => {
     if (!isEditMode || calendarMode !== 'class') return;
     
-    const emptyDateStr = emptyDate.toISOString().split('T')[0];
+    const emptyDateStr = dateToISOString(emptyDate);
     debugLog('Push forward called for empty date:', emptyDateStr);
     
     // Get course schedule
@@ -734,7 +722,7 @@ function Calendar() {
         return;
       }
       
-      const nextDateStr = nextClassDay.toISOString().split('T')[0];
+      const nextDateStr = dateToISOString(nextClassDay);
       updatedSchedule[itemIndex] = { ...item, date: nextDateStr };
       
       debugLog(`Moved ${item.description} from ${item.date} to ${nextDateStr}`);
@@ -751,7 +739,7 @@ function Calendar() {
   const handlePushBack = (emptyDate) => {
     if (!isEditMode || calendarMode !== 'class') return;
     
-    const emptyDateStr = emptyDate.toISOString().split('T')[0];
+    const emptyDateStr = dateToISOString(emptyDate);
     debugLog('Push back called for empty date:', emptyDateStr);
     
     // Get course schedule
@@ -793,7 +781,7 @@ function Calendar() {
         debugWarn(`Could not find next class day after ${emptyDateStr}`);
         return;
       }
-      targetDateStr = targetClassDay.toISOString().split('T')[0];
+      targetDateStr = dateToISOString(targetClassDay);
     }
     
     // Check if the target class day is actually empty (if not, we can't push back)
@@ -823,7 +811,7 @@ function Calendar() {
         break; // No more class days found
       }
       
-      const nextDateStr = nextClassDay.toISOString().split('T')[0];
+      const nextDateStr = dateToISOString(nextClassDay);
       const itemOnNextDay = classSchedule.find(item => 
         item.date === nextDateStr && !isFixedItem(item)
       );
@@ -844,7 +832,7 @@ function Calendar() {
       return;
     }
     
-    const sourceDateStr = sourceClassDay.toISOString().split('T')[0];
+    const sourceDateStr = dateToISOString(sourceClassDay);
     
     debugLog(`Pushing back item: ${itemOnSourceDay.description} from ${sourceDateStr} to ${targetDateStr}`);
     
@@ -903,7 +891,7 @@ function Calendar() {
           return;
         }
         
-        const prevDateStr = prevClassDay.toISOString().split('T')[0];
+        const prevDateStr = dateToISOString(prevClassDay);
         
         // Check if the target position is already occupied (by a non-fixed item that's not this item)
         const hasItemOnTarget = updatedSchedule.some(si => 
@@ -929,7 +917,7 @@ function Calendar() {
   const handleAddClassScheduleItem = (date, description) => {
     if (!description || !description.trim()) {
       // If empty, remove the item if it exists
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = dateToISOString(date);
       const existingItem = classSchedule.find(item => 
         item.date === dateStr && !isFixedItem(item)
       );
@@ -959,7 +947,7 @@ function Calendar() {
       return;
     }
     
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = dateToISOString(date);
     const trimmedDescription = description.trim();
     
     // Check if this date already has a non-fixed item
@@ -1010,7 +998,7 @@ function Calendar() {
     e.preventDefault();
     e.stopPropagation();
     
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = dateToISOString(date);
     
     // Check if this date already has a non-fixed item
     const existingItem = classSchedule.find(item => 
@@ -2041,15 +2029,17 @@ function Calendar() {
     setShowClearCalendarMenu(false);
     closeAllModals();
     
-    // Small delay to ensure modals are closed, then clear and refresh
-    setTimeout(() => {
-      clearAssignmentsInRange(startDate, endDate);
-      
-      // Give time for localStorage to update, then refresh
-      setTimeout(() => {
-        window.location.reload();
-      }, 200);
-    }, 50);
+    // Clear assignments in the range (this updates localStorage and component state synchronously)
+    clearAssignmentsInRange(startDate, endDate);
+    
+    // Reload the current course calendar to reflect changes
+    // clearAssignmentsInRange already updates component state, but we reload to ensure consistency
+    if (selectedCourse) {
+      // Use requestAnimationFrame to ensure state updates have been processed
+      requestAnimationFrame(() => {
+        loadCourseCalendar(selectedCourse);
+      });
+    }
   };
 
   // Navigation handlers - limited to semester boundaries
@@ -2433,7 +2423,7 @@ function Calendar() {
                     // For class schedule items, find the item in classSchedule by matching date and description
                     // The assignment's date property should match the class schedule item's date
                     const assignmentDate = assignment.date || assignment.startDate || assignment.dueDate;
-                    const dateStr = assignmentDate ? (typeof assignmentDate === 'string' ? assignmentDate : assignmentDate.toISOString().split('T')[0]) : null;
+                    const dateStr = dateToISOString(assignmentDate);
                     
                     if (dateStr) {
                       // Find the class schedule item from classSchedule state
