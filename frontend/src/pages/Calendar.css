@@ -867,9 +867,8 @@
 /* Class schedule text styling (for class calendar mode) */
 .class-schedule-text {
   flex: 1;
-  font-family: "Rajdhani", sans-serif;
   font-weight: 600;
-  font-size: 1.4rem;
+  font-size: 1.8rem;
   color: var(--text-main);
   line-height: 1.3;
   padding: 2px 0;
@@ -877,6 +876,21 @@
   overflow-wrap: break-word;
   z-index: 1;
   position: relative;
+}
+
+/* Class schedule chip styling (used by ClassScheduleDay component) */
+.class-schedule-chip {
+  font-weight: 600;
+  font-size: 1.8rem;
+  color: var(--text-main);
+  line-height: 1.3;
+  padding: 4px 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.class-schedule-chip.picked {
+  opacity: 0.5;
 }
 
 /* Full cell background colors for class schedule days - removed to make invisible */
@@ -1197,6 +1211,12 @@
 .assignment-item.class-schedule-item.class-schedule-holiday .assignment-name {
   color: var(--text-main);
   font-weight: normal;
+}
+
+/* Larger text for class schedule items in class calendar mode */
+.calendar-mode-class .assignment-item.class-schedule-item .assignment-name {
+  font-size: 1.8rem;
+  font-weight: 600;
 }
 
 .assignment-name {

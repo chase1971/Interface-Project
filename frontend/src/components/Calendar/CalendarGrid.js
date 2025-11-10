@@ -467,7 +467,7 @@ const CalendarGrid = ({
               />
             );
           })}
-          {!isEditing && dateAssignments.length > 1 && (
+          {!isEditing && dateAssignments.length > 1 && calendarMode !== 'class' && (
             <div 
               className="assignment-more"
               onClick={(e) => {

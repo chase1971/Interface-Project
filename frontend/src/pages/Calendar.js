@@ -10,8 +10,8 @@ import CalendarGrid from "../components/Calendar/CalendarGrid";
 import ExpandedDateModal from "../components/Calendar/ExpandedDateModal";
 import FuturePlanningModal from "../components/Calendar/FuturePlanningModal";
 import ImportCalendarModal from "../components/Calendar/ImportCalendarModal";
-import ClearCalendarModal from "../components/Calendar/ClearCalendarModal";
 import EditAssignmentModal from "../components/Calendar/EditAssignmentModal";
+import SaveDefaultCalendarModal from "../components/Calendar/SaveDefaultCalendarModal";
 import DebugOverlay from "../components/Calendar/DebugOverlay";
 
 // Hooks
@@ -28,6 +28,7 @@ import {
   parseDate,
   formatDate,
   getSemesterDateRange,
+  detectSemesterFromDate,
   normalizeDate,
   parseCsvFile,
   parseClassScheduleCsv,
@@ -86,13 +87,11 @@ function Calendar() {
   const [acceptedFutureAssignments, setAcceptedFutureAssignments] = useState([]);
   
   // Clear calendar state (non-modal state stays here)
-  const [selectedSemester, setSelectedSemester] = useState('');
-  const [showClearConfirmation, setShowClearConfirmation] = useState(false);
   const [showClearCalendarMenu, setShowClearCalendarMenu] = useState(false);
-  const [clearDateRange, setClearDateRange] = useState({ start: null, end: null, label: '' });
   
   // Calendar Options menu state
   const [showCalendarOptionsMenu, setShowCalendarOptionsMenu] = useState(false);
+  const [showSaveDefaultCalendarModal, setShowSaveDefaultCalendarModal] = useState(false);
   
   // Import calendar state (non-modal state stays here)
   const [importingCourse, setImportingCourse] = useState('');
@@ -2009,9 +2008,6 @@ function Calendar() {
     const verifySchedule = localStorage.getItem(scheduleKey);
     logMessages.push(`🔍 Class schedule verification: ${verifySchedule ? 'STILL EXISTS (ERROR!)' : 'REMOVED ✓'}`);
     
-    // Show log
-    alert(logMessages.join('\n'));
-    
     // Also update the hook state
     deleteCourseCalendar(selectedCourse);
     
@@ -2027,48 +2023,72 @@ function Calendar() {
     // But for now, clearing always means "delete everything and show Import Calendar option"
   };
 
-  // Handle semester selection for clearing
-  const handleSemesterSelect = (semesterKey, range) => {
-    setSelectedSemester(semesterKey);
-    setClearDateRange(range);
-    setShowClearConfirmation(true);
-  };
-
-  // Confirm and clear the selected semester
-  const confirmClearSemester = () => {
-    if (clearDateRange.start && clearDateRange.end) {
-      // Save the date range before clearing state
-      const startDate = clearDateRange.start;
-      const endDate = clearDateRange.end;
-      
-      // Close all modals FIRST before clearing to prevent overlay blocking
+  // Clear the current semester view (no semester selection needed)
+  const confirmClearCurrentSemester = () => {
+    // Detect which semester the current view is in
+    const currentSemester = detectSemesterFromDate(currentDate);
+    
+    if (!currentSemester || !currentSemester.range) {
+      alert('Could not determine current semester. Please navigate to a semester month first.');
       setShowClearCalendarMenu(false);
-      setShowClearConfirmation(false);
-      setSelectedSemester('');
-      setClearDateRange({ start: null, end: null, label: '' });
-      closeAllModals();
-      
-      // Small delay to ensure modals are closed, then clear and refresh
-      setTimeout(() => {
-        clearAssignmentsInRange(startDate, endDate);
-        
-        // Give time for localStorage to update, then refresh
-        setTimeout(() => {
-          window.location.reload();
-        }, 200);
-      }, 50);
+      return;
     }
+    
+    const startDate = currentSemester.range.start;
+    const endDate = currentSemester.range.end;
+    
+    // Close all modals FIRST before clearing to prevent overlay blocking
+    setShowClearCalendarMenu(false);
+    closeAllModals();
+    
+    // Small delay to ensure modals are closed, then clear and refresh
+    setTimeout(() => {
+      clearAssignmentsInRange(startDate, endDate);
+      
+      // Give time for localStorage to update, then refresh
+      setTimeout(() => {
+        window.location.reload();
+      }, 200);
+    }, 50);
   };
 
-  // Navigation handlers
+  // Navigation handlers - limited to semester boundaries
   const goToPreviousMonth = () => {
     closeExpandedModal();
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    const currentSemester = detectSemesterFromDate(currentDate);
+    if (!currentSemester || !currentSemester.range) {
+      // If not in a semester, allow free navigation
+      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+      return;
+    }
+    
+    const prevMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+    const prevSemester = detectSemesterFromDate(prevMonth);
+    
+    // Only allow navigation if still in the same semester
+    if (prevSemester && prevSemester.key === currentSemester.key) {
+      setCurrentDate(prevMonth);
+    }
+    // Otherwise, don't navigate (we're at the semester boundary)
   };
 
   const goToNextMonth = () => {
     closeExpandedModal();
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    const currentSemester = detectSemesterFromDate(currentDate);
+    if (!currentSemester || !currentSemester.range) {
+      // If not in a semester, allow free navigation
+      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+      return;
+    }
+    
+    const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+    const nextSemester = detectSemesterFromDate(nextMonth);
+    
+    // Only allow navigation if still in the same semester
+    if (nextSemester && nextSemester.key === currentSemester.key) {
+      setCurrentDate(nextMonth);
+    }
+    // Otherwise, don't navigate (we're at the semester boundary)
   };
 
   const goToToday = () => {
@@ -2205,26 +2225,18 @@ function Calendar() {
         onClearCalendarClick={(e) => {
           e.stopPropagation();
           setShowClearCalendarMenu(!showClearCalendarMenu);
-          setSelectedSemester('');
           setShowCalendarOptionsMenu(false);
         }}
         showClearCalendarMenu={showClearCalendarMenu}
-        selectedSemester={selectedSemester}
-        clearDateRange={clearDateRange}
-        originalAssignments={originalAssignments}
-        acceptedFutureAssignments={acceptedFutureAssignments}
-        onSemesterSelect={handleSemesterSelect}
+        currentDate={currentDate}
         onClearCalendarClose={() => {
           setShowClearCalendarMenu(false);
-          setSelectedSemester('');
         }}
-        onClearCalendarConfirm={confirmClearSemester}
-        onClearCalendarCancel={() => {
-          setShowClearConfirmation(false);
-          setSelectedSemester('');
-          setClearDateRange({ start: null, end: null, label: '' });
+        onClearCalendarConfirm={confirmClearCurrentSemester}
+        onSaveDefaultCalendarClick={() => {
+          setShowSaveDefaultCalendarModal(true);
+          setShowCalendarOptionsMenu(false);
         }}
-        showClearConfirmation={showClearConfirmation}
       />
 
       <div className="calendar-main-wrapper">
@@ -2262,30 +2274,6 @@ function Calendar() {
           </button>
         </header>
         
-        {/* Clear Calendar Modal - moved here since it's triggered from Calendar Options */}
-        {showClearCalendarMenu && (
-          <ClearCalendarModal
-            show={showClearCalendarMenu}
-            showConfirmation={showClearConfirmation}
-            selectedSemester={selectedSemester}
-            clearDateRange={clearDateRange}
-            originalAssignments={originalAssignments}
-            acceptedFutureAssignments={acceptedFutureAssignments}
-            selectedCourse={selectedCourse}
-            onClose={() => {
-              setShowClearCalendarMenu(false);
-              setSelectedSemester('');
-            }}
-            onSemesterSelect={handleSemesterSelect}
-            onConfirm={confirmClearSemester}
-            onCancel={() => {
-              setShowClearConfirmation(false);
-              setSelectedSemester('');
-              setClearDateRange({ start: null, end: null, label: '' });
-            }}
-          />
-        )}
-
         {/* Pending Changes Banner */}
         {hasPendingChanges && offsetAssignments.length > 0 && (
           <div className="pending-changes-banner">
@@ -2590,7 +2578,6 @@ function Calendar() {
         onFileChange={setImportCsvFile}
         onImport={handleImportCalendar}
         onImportDefault={handleImportDefaultCalendar}
-        onRefreshDefaults={refreshDefaultCalendars}
       />
 
 
@@ -2602,6 +2589,21 @@ function Calendar() {
           setEditingAssignment(null);
         }}
         onSave={handleSaveAssignmentEdit}
+      />
+
+      <SaveDefaultCalendarModal
+        show={showSaveDefaultCalendarModal}
+        assignments={originalAssignments}
+        classSchedule={classSchedule}
+        selectedCourse={selectedCourse}
+        courses={courses}
+        onClose={() => {
+          setShowSaveDefaultCalendarModal(false);
+        }}
+        onSave={(calendarData) => {
+          debugLog('Calendar saved as default:', calendarData);
+          // Calendar is already saved by the modal, just close it
+        }}
       />
 
       <DebugOverlay />

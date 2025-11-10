@@ -13,16 +13,10 @@ const CourseSidebar = ({
   onFuturePlanningClick,
   onClearCalendarClick,
   showClearCalendarMenu,
-  selectedSemester,
-  clearDateRange,
-  originalAssignments,
-  acceptedFutureAssignments,
-  onSemesterSelect,
+  currentDate,
   onClearCalendarClose,
   onClearCalendarConfirm,
-  onClearCalendarCancel,
-  showClearConfirmation,
-  selectedCourse: selectedCourseForClear
+  onSaveDefaultCalendarClick
 }) => {
   const [isSemesterMenuOpen, setIsSemesterMenuOpen] = useState(false);
   const [calendarOptionsMenuTop, setCalendarOptionsMenuTop] = useState(50);
@@ -149,34 +143,40 @@ const CourseSidebar = ({
                 >
                   Future Planning
                 </button>
-                <div style={{ position: 'relative' }}>
-                  <button
-                    className="calendar-options-menu-button"
-                    onClick={onClearCalendarClick}
-                  >
-                    Clear Calendar
-                  </button>
-                  {showClearCalendarMenu && (
-                    <ClearCalendarModal
-                      show={showClearCalendarMenu}
-                      showConfirmation={showClearConfirmation}
-                      selectedSemester={selectedSemester}
-                      clearDateRange={clearDateRange}
-                      originalAssignments={originalAssignments}
-                      acceptedFutureAssignments={acceptedFutureAssignments}
-                      selectedCourse={selectedCourseForClear}
-                      onClose={onClearCalendarClose}
-                      onSemesterSelect={onSemesterSelect}
-                      onConfirm={onClearCalendarConfirm}
-                      onCancel={onClearCalendarCancel}
-                    />
-                  )}
-                </div>
+                <button
+                  className="calendar-options-menu-button"
+                  onClick={onSaveDefaultCalendarClick}
+                >
+                  Save Current Calendar to Default
+                </button>
+                <button
+                  type="button"
+                  className="calendar-options-menu-button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (onClearCalendarClick) {
+                      onClearCalendarClick(e);
+                    }
+                  }}
+                >
+                  Clear Calendar
+                </button>
               </div>
             </div>
           )}
         </div>
       </div>
+      {/* Clear Calendar Modal - moved outside menu so it persists when menu closes */}
+      {showClearCalendarMenu && (
+        <ClearCalendarModal
+          show={showClearCalendarMenu}
+          currentDate={currentDate}
+          selectedCourse={selectedCourse}
+          onClose={onClearCalendarClose}
+          onConfirm={onClearCalendarConfirm}
+        />
+      )}
     </div>
   );
 };

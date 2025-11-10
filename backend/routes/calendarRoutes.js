@@ -186,5 +186,53 @@ router.get('/class-schedule', (req, res) => {
   }
 });
 
+// =======================================================
+// 💾 SAVE CALENDAR CSV FILES — saves assignment and class schedule CSV files
+// =======================================================
+router.post('/save-csv', (req, res) => {
+  try {
+    const { filename, content, type } = req.body; // type: 'assignment' or 'class'
+    
+    if (!filename || !content || !type) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required fields: filename, content, and type' 
+      });
+    }
+
+    // Path to the public/Calendar folder in the frontend
+    // This assumes the backend is in Interface-Project/backend and frontend is in Interface-Project/frontend
+    const calendarDir = path.join(__dirname, '..', '..', 'frontend', 'public', 'Calendar');
+    
+    // Ensure the directory exists
+    if (!fs.existsSync(calendarDir)) {
+      fs.mkdirSync(calendarDir, { recursive: true });
+    }
+
+    // Sanitize filename (remove any path traversal attempts)
+    const safeFilename = path.basename(filename);
+    
+    // Full path to the CSV file
+    const filePath = path.join(calendarDir, safeFilename);
+
+    // Write the file
+    fs.writeFileSync(filePath, content, 'utf-8');
+
+    console.log(`✅ Saved ${type} CSV file: ${safeFilename}`);
+
+    res.json({ 
+      success: true, 
+      message: `CSV file saved successfully: ${safeFilename}`,
+      path: filePath
+    });
+  } catch (error) {
+    console.error('Error saving CSV file:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to save CSV file: ' + error.message 
+    });
+  }
+});
+
 module.exports = router;
 

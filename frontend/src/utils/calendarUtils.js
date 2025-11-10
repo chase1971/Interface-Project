@@ -569,25 +569,68 @@ export const getSemesterDateRange = (semesterKey) => {
       end: end,
       label: `Spring ${year}`
     };
-  } else if (semester === 'Summer1') {
+  } else if (semester === 'Summer' || semester === 'Summer1' || semester === 'Summer2') {
+    // Summer is June, July, August
     const start = new Date(yearNum, 5, 1); // June 1
-    const end = new Date(yearNum, 6, 14); // July 14
+    const end = new Date(yearNum, 7, 31); // August 31
     end.setHours(23, 59, 59, 999); // End of day
     return {
       start: start,
       end: end,
-      label: `Summer 1 ${year}`
-    };
-  } else if (semester === 'Summer2') {
-    const start = new Date(yearNum, 6, 16); // July 16
-    const end = new Date(yearNum, 7, 23); // August 23
-    end.setHours(23, 59, 59, 999); // End of day
-    return {
-      start: start,
-      end: end,
-      label: `Summer 2 ${year}`
+      label: `Summer ${year}`
     };
   }
+  return null;
+};
+
+// Detect which semester a given date falls into
+export const detectSemesterFromDate = (date) => {
+  if (!date) return null;
+  
+  const year = date.getFullYear();
+  const month = date.getMonth(); // 0-11 (Jan = 0, Dec = 11)
+  const day = date.getDate();
+  
+  // Fall: August (7) to December (11)
+  if (month >= 7 && month <= 11) {
+    return {
+      semester: 'Fall',
+      year: year,
+      key: `Fall-${year}`,
+      range: getSemesterDateRange(`Fall-${year}`)
+    };
+  }
+  
+  // Spring: January (0) to May (4)
+  if (month >= 0 && month <= 4) {
+    return {
+      semester: 'Spring',
+      year: year,
+      key: `Spring-${year}`,
+      range: getSemesterDateRange(`Spring-${year}`)
+    };
+  }
+  
+  // Summer: June (5), July (6), August (7)
+  if (month >= 5 && month <= 7) {
+    // If it's August and before the 24th, it's still Summer
+    // If it's August 24th or later, it's Fall
+    if (month === 7 && day >= 24) {
+      return {
+        semester: 'Fall',
+        year: year,
+        key: `Fall-${year}`,
+        range: getSemesterDateRange(`Fall-${year}`)
+      };
+    }
+    return {
+      semester: 'Summer',
+      year: year,
+      key: `Summer-${year}`,
+      range: getSemesterDateRange(`Summer-${year}`)
+    };
+  }
+  
   return null;
 };
 

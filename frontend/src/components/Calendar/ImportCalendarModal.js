@@ -11,7 +11,6 @@ const ImportCalendarModal = ({
   onFileChange,
   onImport,
   onImportDefault,
-  onRefreshDefaults
 }) => {
   const { defaultCalendars, getDefaultCalendarsByFilter } = useDefaultCalendars();
   const [selectedDefaultCalendar, setSelectedDefaultCalendar] = useState(null);
@@ -211,23 +210,6 @@ const ImportCalendarModal = ({
               Cancel
             </button>
           </div>
-          {onRefreshDefaults && (
-            <button 
-              className="semester-menu-button"
-              onClick={onRefreshDefaults}
-              style={{
-                width: '100%',
-                fontSize: '0.8rem',
-                padding: '0.4rem',
-                background: 'rgba(255, 152, 0, 0.1)',
-                borderColor: '#ff9800',
-                color: '#ff9800'
-              }}
-              title="Refresh default calendars from CSV files (use after updating CSV files)"
-            >
-              🔄 Refresh Default Calendars from CSV
-            </button>
-          )}
         </div>
       </div>
     </div>
