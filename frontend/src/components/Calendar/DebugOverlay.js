@@ -239,7 +239,8 @@ const DebugOverlay = () => {
       `[${log.timestamp}] ${log.type.toUpperCase()}: ${log.message}`
     ).join('\n');
     navigator.clipboard.writeText(logText);
-    alert('Logs copied to clipboard!');
+    // Removed alert - logs are copied silently
+    console.log('Logs copied to clipboard');
   };
 
   const handleToggleDebug = () => {

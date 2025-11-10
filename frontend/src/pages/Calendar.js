@@ -34,10 +34,12 @@ import {
   monthNames,
   copyAndShiftTRtoMW,
   getCourseSchedule,
-  normalizeClassScheduleDate
+  normalizeClassScheduleDate,
+  isFixedItem,
+  getClassScheduleItemType
 } from "../utils/calendarUtils";
 import { validateCsvFiles } from "../utils/csvValidation";
-import { cascadeMoveItems } from "../utils/classDayUtils";
+import { cascadeMoveItems, findNextClassDay, findPreviousClassDay } from "../utils/classDayUtils";
 import { debugLog, debugError, debugWarn } from "../utils/debug";
 
 // Config
@@ -455,25 +457,12 @@ function Calendar() {
     // Build holiday date set from class schedule items (holidays and final exams) for cascading logic
     const holidayDates = new Set();
     updatedSchedule.forEach(item => {
-      const desc = item.description.toLowerCase();
-      // Check if it's a holiday or final exam
-      if (desc.includes('thanksgiving') || 
-          desc.includes('labor day') || 
-          desc.includes('holiday') ||
-          desc.includes('christmas') ||
-          desc.includes('new year') ||
-          desc.includes('easter') ||
-          desc.includes('memorial day') ||
-          desc.includes('independence day') ||
-          desc.includes('presidents day') ||
-          desc.includes('martin luther king') ||
-          desc.includes('mlk day') ||
-          desc.includes('spring break') ||
-          desc.includes('final exam') ||
-          desc.includes('final')) {
+      // Use utility function to check if it's a fixed item (holiday or final exam)
+      if (isFixedItem(item)) {
         holidayDates.add(item.date);
         
         // Thanksgiving spans Nov 26-27, so add both dates
+        const desc = (item.description || '').toLowerCase();
         if (desc.includes('thanksgiving')) {
           const [year, month, day] = item.date.split('-').map(Number);
           if (month === 11 && day === 26) {
@@ -506,24 +495,8 @@ function Calendar() {
     // Exclude fixed holidays and final exams from collision check - they don't count as "occupied"
     const targetDateItem = updatedSchedule.find(item => {
       if (item.date !== targetDateStr) return false;
-      // Check if this is a fixed item (holiday or final exam) - these don't count as collisions
-      const desc = (item.description || '').toLowerCase();
-      const isFixed = desc.includes('thanksgiving') || 
-                      desc.includes('labor day') || 
-                      desc.includes('holiday') || 
-                      desc.includes('christmas') || 
-                      desc.includes('new year') || 
-                      desc.includes('easter') || 
-                      desc.includes('memorial day') || 
-                      desc.includes('independence day') || 
-                      desc.includes('presidents day') || 
-                      desc.includes('martin luther king') || 
-                      desc.includes('mlk day') || 
-                      desc.includes('spring break') ||
-                      desc.includes('final exam') || 
-                      desc.includes('final');
       // Only count as occupied if it's NOT a fixed item
-      return !isFixed;
+      return !isFixedItem(item);
     });
     const isTargetEmpty = !targetDateItem;
     
@@ -531,28 +504,14 @@ function Calendar() {
       targetDateStr, 
       isTargetEmpty, 
       targetItem: targetDateItem,
-      allItemsOnTarget: updatedSchedule.filter(item => item.date === targetDateStr).map(i => ({ desc: i.description, isFixed: (i.description || '').toLowerCase().includes('thanksgiving') || (i.description || '').toLowerCase().includes('final') }))
+      allItemsOnTarget: updatedSchedule.filter(item => item.date === targetDateStr).map(i => ({ desc: i.description, isFixed: isFixedItem(i) }))
     });
     
     // Convert to format expected by cascadeMoveItems
     const scheduleItemsForCascade = updatedSchedule.map(item => {
-      // Detect item type
-      const desc = item.description.toLowerCase();
-      let itemType = 'regular';
-      let isFixed = false;
-      
-      // Check if this is a fixed holiday or final exam (should not be moved)
-      if (desc.includes('thanksgiving') || desc.includes('labor day') || desc.includes('holiday') || desc.includes('christmas') || desc.includes('new year') || desc.includes('easter') || desc.includes('memorial day') || desc.includes('independence day') || desc.includes('presidents day') || desc.includes('martin luther king') || desc.includes('mlk day') || desc.includes('spring break')) {
-        itemType = 'holiday';
-        isFixed = true; // Holidays should not be moved by cascading
-      } else if (desc.includes('final exam') || desc.includes('final')) {
-        itemType = 'exam';
-        isFixed = true; // Final exams should not be moved by cascading
-      } else if (desc.includes('test')) {
-        itemType = 'test';
-      } else if (desc.includes('quiz')) {
-        itemType = 'quiz';
-      }
+      // Use utility function to get item type and check if it's fixed
+      const itemType = getClassScheduleItemType(item.description);
+      const isFixed = isFixedItem(item);
       
       return {
         type: 'classSchedule',
@@ -616,30 +575,13 @@ function Calendar() {
     });
     
     debugLog('Cascaded map created with', cascadedMap.size, 'items');
-    debugLog('Fixed items in original schedule:', updatedSchedule.filter(item => {
-      const desc = (item.description || '').toLowerCase();
-      return desc.includes('thanksgiving') || desc.includes('final exam') || desc.includes('final');
-    }).map(i => ({ desc: i.description, date: i.date })));
+    debugLog('Fixed items in original schedule:', updatedSchedule
+      .filter(item => isFixedItem(item))
+      .map(i => ({ desc: i.description, date: i.date })));
     
     const newClassSchedule = updatedSchedule.map(item => {
       // Check if this is a fixed item (holiday or final exam) - NEVER update these
-      const desc = (item.description || '').toLowerCase();
-      const isFixed = desc.includes('thanksgiving') || 
-                      desc.includes('labor day') || 
-                      desc.includes('holiday') || 
-                      desc.includes('christmas') || 
-                      desc.includes('new year') || 
-                      desc.includes('easter') || 
-                      desc.includes('memorial day') || 
-                      desc.includes('independence day') || 
-                      desc.includes('presidents day') || 
-                      desc.includes('martin luther king') || 
-                      desc.includes('mlk day') || 
-                      desc.includes('spring break') ||
-                      desc.includes('final exam') || 
-                      desc.includes('final');
-      
-      if (isFixed) {
+      if (isFixedItem(item)) {
         // Fixed items should NEVER have their dates changed - preserve original date
         debugLog('Preserving fixed item date (holiday/final exam)', { 
           description: item.description, 
@@ -703,6 +645,224 @@ function Calendar() {
       shouldStopDrag: shouldStopDragRef.current,
       pickedUpScheduleItemRef: pickedUpScheduleItemRef.current
     });
+  };
+
+  // Handle pushing items forward (filling a gap by moving items after the empty date forward)
+  const handlePushForward = (emptyDate) => {
+    if (!isEditMode || calendarMode !== 'class') return;
+    
+    const emptyDateStr = emptyDate.toISOString().split('T')[0];
+    debugLog('Push forward called for empty date:', emptyDateStr);
+    
+    // Get course schedule
+    const courseSchedule = getCourseSchedule(selectedCourse, COURSES);
+    if (!courseSchedule) {
+      debugError('Could not determine course schedule');
+      return;
+    }
+    
+    // Build holiday dates set
+    const holidayDates = new Set();
+    classSchedule.forEach(item => {
+      if (isFixedItem(item)) {
+        holidayDates.add(item.date);
+        const desc = (item.description || '').toLowerCase();
+        if (desc.includes('thanksgiving')) {
+          const [year, month, day] = item.date.split('-').map(Number);
+          if (month === 11 && day === 26) {
+            holidayDates.add(`${year}-11-27`);
+          }
+        }
+      }
+    });
+    
+    // Find all items that come AFTER the empty date (sorted by date)
+    const itemsAfterEmpty = classSchedule
+      .filter(item => {
+        if (isFixedItem(item)) return false; // Don't move fixed items
+        return item.date > emptyDateStr;
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+    
+    if (itemsAfterEmpty.length === 0) {
+      debugLog('No items to push forward');
+      return;
+    }
+    
+    debugLog(`Pushing ${itemsAfterEmpty.length} items forward from ${emptyDateStr}`);
+    
+    // Move each item forward by one class day
+    const updatedSchedule = [...classSchedule];
+    let currentDate = new Date(emptyDate);
+    currentDate.setDate(currentDate.getDate() + 1); // Start from day after empty date
+    
+    itemsAfterEmpty.forEach((item, index) => {
+      const itemIndex = updatedSchedule.findIndex(si => 
+        si.date === item.date && si.description === item.description
+      );
+      
+      if (itemIndex === -1) return;
+      
+      // Find the next class day starting from currentDate
+      const nextClassDay = findNextClassDay(currentDate, courseSchedule, holidayDates);
+      if (!nextClassDay) {
+        debugWarn(`Could not find next class day for item ${item.description}`);
+        return;
+      }
+      
+      const nextDateStr = nextClassDay.toISOString().split('T')[0];
+      updatedSchedule[itemIndex] = { ...item, date: nextDateStr };
+      
+      debugLog(`Moved ${item.description} from ${item.date} to ${nextDateStr}`);
+      
+      // Update currentDate for next iteration
+      currentDate = new Date(nextClassDay);
+      currentDate.setDate(currentDate.getDate() + 1);
+    });
+    
+    setClassSchedule(updatedSchedule);
+  };
+
+  // Handle pushing items backward (creating a gap by moving the item from previous class day to empty date)
+  const handlePushBack = (emptyDate) => {
+    if (!isEditMode || calendarMode !== 'class') return;
+    
+    const emptyDateStr = emptyDate.toISOString().split('T')[0];
+    debugLog('Push back called for empty date:', emptyDateStr);
+    
+    // Get course schedule
+    const courseSchedule = getCourseSchedule(selectedCourse, COURSES);
+    if (!courseSchedule) {
+      debugError('Could not determine course schedule');
+      return;
+    }
+    
+    // Build holiday dates set
+    const holidayDates = new Set();
+    classSchedule.forEach(item => {
+      if (isFixedItem(item)) {
+        holidayDates.add(item.date);
+        const desc = (item.description || '').toLowerCase();
+        if (desc.includes('thanksgiving')) {
+          const [year, month, day] = item.date.split('-').map(Number);
+          if (month === 11 && day === 26) {
+            holidayDates.add(`${year}-11-27`);
+          }
+        }
+      }
+    });
+    
+    // Find the previous class day before the clicked date (this is where we'll move the item FROM)
+    const sourceClassDay = findPreviousClassDay(emptyDate, courseSchedule, holidayDates);
+    if (!sourceClassDay) {
+      debugWarn(`Could not find previous class day before ${emptyDateStr}`);
+      return;
+    }
+    
+    const sourceDateStr = sourceClassDay.toISOString().split('T')[0];
+    
+    // Find the item on that previous class day (if any)
+    const itemOnSourceDay = classSchedule.find(item => 
+      item.date === sourceDateStr && !isFixedItem(item)
+    );
+    
+    if (!itemOnSourceDay) {
+      debugLog(`Previous class day ${sourceDateStr} is empty, nothing to push back`);
+      return;
+    }
+    
+    // Now find the previous empty class day before the source date (this is where we'll move the item TO)
+    const targetClassDay = findPreviousClassDay(sourceClassDay, courseSchedule, holidayDates);
+    if (!targetClassDay) {
+      debugWarn(`Could not find previous empty class day before ${sourceDateStr}`);
+      return;
+    }
+    
+    const targetDateStr = targetClassDay.toISOString().split('T')[0];
+    
+    // Check if the target class day is actually empty (if not, we can't push back)
+    const hasItemOnTarget = classSchedule.some(item => 
+      item.date === targetDateStr && !isFixedItem(item)
+    );
+    
+    if (hasItemOnTarget) {
+      const message = `Target class day ${targetDateStr} is occupied. Cannot push back.`;
+      debugLog(message);
+      alert(message);
+      return;
+    }
+    
+    debugLog(`Pushing back item: ${itemOnSourceDay.description} from ${sourceDateStr} to ${targetDateStr}`);
+    
+    // First, move the item from source to target
+    const updatedSchedule = [...classSchedule];
+    const sourceItemIndex = updatedSchedule.findIndex(item => 
+      item.date === itemOnSourceDay.date && item.description === itemOnSourceDay.description
+    );
+    
+    if (sourceItemIndex !== -1) {
+      updatedSchedule[sourceItemIndex] = { ...itemOnSourceDay, date: targetDateStr };
+      debugLog(`Moved ${itemOnSourceDay.description} from ${sourceDateStr} to ${targetDateStr}`);
+    }
+    
+    // Now cascade: find all items after the source date and shift them backward by one class day
+    // Process items in order (earliest first) so each move fills the gap left by the previous
+    const itemsAfterSource = classSchedule
+      .filter(item => {
+        if (isFixedItem(item)) return false; // Don't move fixed items
+        return item.date > sourceDateStr;
+      })
+      .sort((a, b) => a.date.localeCompare(b.date)); // Sort ascending (earliest first)
+    
+    if (itemsAfterSource.length > 0) {
+      debugLog(`Cascading ${itemsAfterSource.length} items backward from ${sourceDateStr}`);
+      
+      itemsAfterSource.forEach(item => {
+        // Find the item in the updated schedule by description (date may have changed)
+        const itemIndex = updatedSchedule.findIndex(si => 
+          si.description === item.description
+        );
+        
+        if (itemIndex === -1) {
+          debugWarn(`Could not find item ${item.description} in schedule`);
+          return;
+        }
+        
+        const currentItem = updatedSchedule[itemIndex];
+        const currentItemDateStr = currentItem.date;
+        
+        // Parse the current date
+        const [year, month, day] = currentItemDateStr.split('-').map(Number);
+        const currentItemDate = new Date(year, month - 1, day);
+        
+        // Find the previous class day from this item's current position
+        const prevClassDay = findPreviousClassDay(currentItemDate, courseSchedule, holidayDates);
+        
+        if (!prevClassDay) {
+          debugWarn(`Could not find previous class day for ${currentItem.description}`);
+          return;
+        }
+        
+        const prevDateStr = prevClassDay.toISOString().split('T')[0];
+        
+        // Check if the target position is already occupied (by a non-fixed item that's not this item)
+        const hasItemOnTarget = updatedSchedule.some(si => 
+          si.date === prevDateStr && !isFixedItem(si) && 
+          si.description !== currentItem.description
+        );
+        
+        if (hasItemOnTarget) {
+          debugWarn(`Target position ${prevDateStr} is occupied, skipping cascade for ${currentItem.description}`);
+          return;
+        }
+        
+        // Move the item to the previous class day position
+        updatedSchedule[itemIndex] = { ...currentItem, date: prevDateStr };
+        debugLog(`Cascaded ${currentItem.description} from ${currentItemDateStr} to ${prevDateStr}`);
+      });
+    }
+    
+    setClassSchedule(updatedSchedule);
   };
 
   // Load calendar data for a specific course
@@ -2147,6 +2307,9 @@ function Calendar() {
                 scheduleItemDragPosition={scheduleItemDragPosition}
                 onScheduleItemPickup={handleScheduleItemPickup}
                 onScheduleItemDrop={handleScheduleItemDrop}
+                onPushForward={handlePushForward}
+                onPushBack={handlePushBack}
+                courseSchedule={getCourseSchedule(selectedCourse, COURSES)}
               />
             </>
           )}

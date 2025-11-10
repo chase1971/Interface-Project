@@ -723,3 +723,72 @@ export const monthNames = [
 
 export const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+/**
+ * Check if a calendar item is a fixed item (holiday or final exam) that should not be moved
+ * @param {Object|string} item - The item to check (object with description/itemName, or string description)
+ * @returns {boolean} - True if the item is a fixed holiday or final exam
+ */
+export const isFixedItem = (item) => {
+  if (!item) return false;
+  
+  // If item has isFixedHoliday property, use it
+  if (typeof item === 'object' && item.isFixedHoliday === true) {
+    return true;
+  }
+  
+  // Get description from item (could be object with description/itemName, or just a string)
+  const desc = typeof item === 'string' 
+    ? item.toLowerCase() 
+    : (item.description || item.itemName || '').toLowerCase();
+  
+  if (!desc) return false;
+  
+  // Check for holidays
+  const isHoliday = desc.includes('thanksgiving') || 
+                    desc.includes('labor day') || 
+                    desc.includes('holiday') ||
+                    desc.includes('christmas') ||
+                    desc.includes('new year') ||
+                    desc.includes('easter') ||
+                    desc.includes('memorial day') ||
+                    desc.includes('independence day') ||
+                    desc.includes('presidents day') ||
+                    desc.includes('martin luther king') ||
+                    desc.includes('mlk day') ||
+                    desc.includes('spring break');
+  
+  // Check for final exam
+  const isFinalExam = desc.includes('final exam') || desc.includes('final');
+  
+  return isHoliday || isFinalExam;
+};
+
+/**
+ * Get the item type for a class schedule item
+ * @param {string} description - The item description
+ * @returns {string} - The item type: 'holiday', 'exam', 'test', 'quiz', or 'regular'
+ */
+export const getClassScheduleItemType = (description) => {
+  if (!description) return 'regular';
+  
+  const desc = description.toLowerCase();
+  
+  if (isFixedItem(description)) {
+    // Check if it's a holiday or final exam
+    if (desc.includes('final exam') || desc.includes('final')) {
+      return 'exam';
+    }
+    return 'holiday';
+  }
+  
+  if (desc.includes('test')) {
+    return 'test';
+  }
+  
+  if (desc.includes('quiz')) {
+    return 'quiz';
+  }
+  
+  return 'regular';
+};
+

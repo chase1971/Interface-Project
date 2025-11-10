@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { parseDate, getDaysInMonth, dayNames } from '../../utils/calendarUtils';
+import { debugLog } from '../../utils/debug';
 import DraggableAssignment from './DraggableAssignment';
 import ClassScheduleDay from './ClassScheduleDay';
 
@@ -22,9 +23,41 @@ const CalendarGrid = ({
   pickedUpScheduleItem,
   scheduleItemDragPosition,
   onScheduleItemPickup,
-  onScheduleItemDrop
+  onScheduleItemDrop,
+  onPushForward,
+  onPushBack,
+  courseSchedule
 }) => {
   const [dragOverDate, setDragOverDate] = useState(null);
+  const [selectedEmptyDate, setSelectedEmptyDate] = useState(null);
+  const [emptyDateMenuPosition, setEmptyDateMenuPosition] = useState(null);
+  
+  // Close empty date menu on ESC key
+  useEffect(() => {
+    if (!selectedEmptyDate) return;
+    
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        console.log('ESC pressed, closing empty date menu');
+        setSelectedEmptyDate(null);
+        setEmptyDateMenuPosition(null);
+      }
+    };
+    
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [selectedEmptyDate]);
+  
+  // Debug: Log when menu state changes
+  useEffect(() => {
+    if (selectedEmptyDate) {
+      console.log('Empty date menu opened', { 
+        date: selectedEmptyDate.toISOString().split('T')[0],
+        position: emptyDateMenuPosition
+      });
+    }
+  }, [selectedEmptyDate, emptyDateMenuPosition]);
+  
   const daysInMonth = getDaysInMonth(currentDate);
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -167,6 +200,15 @@ const CalendarGrid = ({
         onClick={(e) => {
           e.stopPropagation();
           
+          console.log('Calendar day clicked', {
+            date: date.toISOString().split('T')[0],
+            isEditMode,
+            calendarMode,
+            dateAssignmentsCount: dateAssignments.length,
+            hasClassScheduleItem: dateAssignments.some(item => item.isClassSchedule),
+            hasPickedUpItem: !!pickedUpScheduleItem
+          });
+          
           // ===== CLASS MODE: click-to-pick, click-to-drop =====
           if (isEditMode && calendarMode === 'class') {
             const clickedElement = e.target;
@@ -200,6 +242,54 @@ const CalendarGrid = ({
                 if (actualScheduleItem) {
                   onScheduleItemPickup(date, actualScheduleItem, e);
                 }
+              }
+              return;
+            }
+            
+            // If clicking on an empty date box (no schedule item), show push forward/back menu
+            // This should be the last check in class mode
+            const hasClassScheduleItem = dateAssignments.some(item => item.isClassSchedule);
+            const dateStr = date.toISOString().split('T')[0];
+            
+            console.log('Checking for empty date menu', {
+              date: dateStr,
+              hasPickedUpItem: !!pickedUpScheduleItem,
+              hasClassScheduleItem,
+              hasPushHandlers: !!(onPushForward || onPushBack),
+              dateAssignments: dateAssignments.map(a => ({ name: a.itemName, isClass: a.isClassSchedule }))
+            });
+            
+            if (!pickedUpScheduleItem && !hasClassScheduleItem && (onPushForward || onPushBack)) {
+              console.log('Empty date detected, showing menu');
+              e.preventDefault();
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              
+              // Check if this is a potential class day (Mon, Tue, Wed, Thu - not weekend)
+              // Allow any weekday that could be a class day, regardless of current schedule
+              const dayOfWeek = date.getDay();
+              const schedule = courseSchedule || (calendarMode === 'class' ? 'TR' : 'MW');
+              // Allow Monday (1), Tuesday (2), Wednesday (3), or Thursday (4)
+              const isPotentialClassDay = dayOfWeek >= 1 && dayOfWeek <= 4;
+              
+              console.log('Class day check', { 
+                dayOfWeek, 
+                schedule, 
+                isPotentialClassDay, 
+                courseSchedule,
+                dayName: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeek]
+              });
+              
+              if (isPotentialClassDay) {
+                const menuPos = {
+                  top: rect.top + rect.height / 2,
+                  left: rect.left + rect.width / 2
+                };
+                console.log('Showing push menu', { date: dateStr, menuPos });
+                setSelectedEmptyDate(date);
+                setEmptyDateMenuPosition(menuPos);
+              } else {
+                console.log('Not a potential class day (weekend), not showing menu');
               }
               return;
             }
@@ -249,7 +339,9 @@ const CalendarGrid = ({
           className="day-assignments" 
           data-count={dateAssignments.length}
           style={{
-            minHeight: '20px'
+            minHeight: '20px',
+            // Allow clicks to pass through to parent when empty
+            pointerEvents: dateAssignments.length === 0 ? 'none' : 'auto'
           }}
         >
           {dateAssignments.slice(0, 1).map((assignment, idx) => {
@@ -398,6 +490,111 @@ const CalendarGrid = ({
           Moving: {pickedUpScheduleItem.itemName || pickedUpScheduleItem.description || 'Class item'}
           <span style={{ marginLeft: 8, opacity: 0.8 }}>(ESC to cancel)</span>
         </div>
+      )}
+      {/* Empty date menu for push forward/back */}
+      {selectedEmptyDate && emptyDateMenuPosition && isEditMode && calendarMode === 'class' && (
+        <>
+          <div 
+            className="empty-date-menu-overlay"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedEmptyDate(null);
+              setEmptyDateMenuPosition(null);
+            }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 9998,
+              background: 'rgba(0, 0, 0, 0.3)'
+            }}
+          />
+          <div
+            className="empty-date-menu"
+            style={{
+              position: 'fixed',
+              top: emptyDateMenuPosition.top - 60,
+              left: emptyDateMenuPosition.left - 80,
+              zIndex: 9999,
+              background: 'rgba(13, 17, 23, 0.95)',
+              border: '2px solid var(--accent-blue)',
+              borderRadius: '8px',
+              padding: '12px',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              minWidth: '160px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ 
+              fontSize: '12px', 
+              color: 'var(--text-dim)', 
+              marginBottom: '4px',
+              textAlign: 'center'
+            }}>
+              Shift Schedule
+            </div>
+            {onPushForward && (
+              <button
+                className="nav-button"
+                onClick={() => {
+                  onPushForward(selectedEmptyDate);
+                  setSelectedEmptyDate(null);
+                  setEmptyDateMenuPosition(null);
+                }}
+                style={{
+                  padding: '8px 12px',
+                  fontSize: '14px',
+                  background: 'rgba(76, 175, 80, 0.2)',
+                  borderColor: '#4caf50',
+                  color: '#4caf50'
+                }}
+              >
+                → Push Forward
+              </button>
+            )}
+            {onPushBack && (
+              <button
+                className="nav-button"
+                onClick={() => {
+                  onPushBack(selectedEmptyDate);
+                  setSelectedEmptyDate(null);
+                  setEmptyDateMenuPosition(null);
+                }}
+                style={{
+                  padding: '8px 12px',
+                  fontSize: '14px',
+                  background: 'rgba(255, 152, 0, 0.2)',
+                  borderColor: '#ff9800',
+                  color: '#ff9800'
+                }}
+              >
+                ← Push Back
+              </button>
+            )}
+            <button
+              className="nav-button"
+              onClick={() => {
+                setSelectedEmptyDate(null);
+                setEmptyDateMenuPosition(null);
+              }}
+              style={{
+                padding: '6px 12px',
+                fontSize: '12px',
+                background: 'rgba(100, 100, 100, 0.2)',
+                borderColor: 'var(--text-dim)',
+                color: 'var(--text-dim)',
+                marginTop: '4px'
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </>
       )}
     </>
   );

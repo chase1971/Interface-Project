@@ -1,5 +1,5 @@
 // Utilities for finding next class days and managing class day sequences
-import { getDateForClassDay, getClassDayNumber, getCourseSchedule } from './calendarUtils';
+import { getDateForClassDay, getClassDayNumber, getCourseSchedule, isFixedItem } from './calendarUtils';
 import { createHolidayDateSet } from './holidayUtils';
 
 /**
@@ -82,6 +82,85 @@ export const findNextClassDay = (date, scheduleType, holidayDates = new Set()) =
 };
 
 /**
+ * Finds the previous class day before a given date, respecting the schedule pattern
+ * @param {Date|string} date - The starting date
+ * @param {string} scheduleType - Schedule type ('MW' or 'TR')
+ * @param {Set} holidayDates - Set of holiday date strings to skip
+ * @returns {Date|null} - The previous class day, or null if not found
+ */
+export const findPreviousClassDay = (date, scheduleType, holidayDates = new Set()) => {
+  if (!date || !scheduleType) return null;
+  
+  const dateObj = typeof date === 'string'
+    ? (() => {
+        const [y, m, d] = date.split('-').map(Number);
+        return new Date(y, m - 1, d);
+      })()
+    : new Date(date);
+  
+  // Ensure we're working with a date at midnight to avoid timezone issues
+  dateObj.setHours(0, 0, 0, 0);
+  
+  // Determine target days for schedule
+  let day1, day2;
+  if (scheduleType === 'MW') {
+    day1 = 1; // Monday
+    day2 = 3; // Wednesday
+  } else if (scheduleType === 'TR') {
+    day1 = 2; // Tuesday
+    day2 = 4; // Thursday
+  } else {
+    return null;
+  }
+  
+  const currentDayOfWeek = dateObj.getDay();
+  
+  // Find the previous class day - start from the day BEFORE the given date
+  let prevDate = new Date(dateObj);
+  prevDate.setDate(prevDate.getDate() - 1); // Start from yesterday
+  
+  // Skip holidays and find the previous valid class day
+  let attempts = 0;
+  while (attempts < 100) {
+    const prevDayOfWeek = prevDate.getDay();
+    const prevDateStr = prevDate.toISOString().split('T')[0];
+    
+    // Check if this is a class day and not a holiday
+    // Also check if it's Thanksgiving (Nov 26-27) - skip both days
+    const [year, month, day] = prevDateStr.split('-').map(Number);
+    const isThanksgiving = (month === 11 && (day === 26 || day === 27));
+    const isHoliday = holidayDates.has(prevDateStr) || isThanksgiving;
+    
+    if ((prevDayOfWeek === day1 || prevDayOfWeek === day2) && !isHoliday) {
+      return prevDate;
+    }
+    
+    // Not a valid class day (either wrong day of week or holiday), move backward
+    if (prevDayOfWeek === day2) {
+      // It's day2 but it's a holiday, move to day1
+      prevDate.setDate(prevDate.getDate() - 2);
+    } else if (prevDayOfWeek === day1) {
+      // It's day1 but it's a holiday, move to previous week's day2
+      prevDate.setDate(prevDate.getDate() - 5);
+    } else if (prevDayOfWeek > day2) {
+      // After day2, move to day2
+      prevDate.setDate(prevDate.getDate() - (prevDayOfWeek - day2));
+    } else if (prevDayOfWeek > day1) {
+      // Between day1 and day2, move to day1
+      prevDate.setDate(prevDate.getDate() - (prevDayOfWeek - day1));
+    } else {
+      // Before day1, move to previous week's day2
+      prevDate.setDate(prevDate.getDate() - (prevDayOfWeek + 7 - day2));
+    }
+    
+    attempts++;
+  }
+  
+  console.warn('findPreviousClassDay: Could not find previous class day before', dateObj.toISOString().split('T')[0]);
+  return null;
+};
+
+/**
  * Cascades items when moving an item to a new date
  * @param {Array} items - Array of calendar items
  * @param {string} sourceDateStr - Source date (YYYY-MM-DD)
@@ -90,32 +169,6 @@ export const findNextClassDay = (date, scheduleType, holidayDates = new Set()) =
  * @param {Set} holidayDates - Set of holiday date strings
  * @returns {Array} - Updated array of items with cascaded dates
  */
-// Helper function to check if an item is a holiday or final exam (should not be moved)
-const isFixedItem = (item) => {
-  if (!item || item.isFixedHoliday) return true;
-  const desc = (item.description || item.itemName || '').toLowerCase();
-  // Check for holidays
-  if (desc.includes('thanksgiving') || 
-      desc.includes('labor day') || 
-      desc.includes('holiday') ||
-      desc.includes('christmas') ||
-      desc.includes('new year') ||
-      desc.includes('easter') ||
-      desc.includes('memorial day') ||
-      desc.includes('independence day') ||
-      desc.includes('presidents day') ||
-      desc.includes('martin luther king') ||
-      desc.includes('mlk day') ||
-      desc.includes('spring break')) {
-    return true;
-  }
-  // Check for final exam
-  if (desc.includes('final exam') || desc.includes('final')) {
-    return true;
-  }
-  return false;
-};
-
 export const cascadeMoveItems = (items, sourceDateStr, targetDateStr, scheduleType, holidayDates = new Set(), sourceItemDescription = null) => {
   console.log('=== cascadeMoveItems called ===', { sourceDateStr, targetDateStr, scheduleType, itemsCount: items.length, sourceItemDescription });
   
