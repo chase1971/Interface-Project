@@ -126,6 +126,33 @@ export const createHolidayDateSet = (holidayItems) => {
 };
 
 /**
+ * Builds a holiday date set from a class schedule, including fixed items and Thanksgiving special case
+ * @param {Array} classSchedule - Array of class schedule items
+ * @param {Function} isFixedItem - Function to check if an item is fixed (holiday/exam)
+ * @returns {Set} - Set of holiday date strings (YYYY-MM-DD format)
+ */
+export const buildHolidayDateSetFromSchedule = (classSchedule, isFixedItem) => {
+  const holidayDates = new Set();
+  
+  classSchedule.forEach(item => {
+    if (isFixedItem(item)) {
+      holidayDates.add(item.date);
+      
+      // Thanksgiving spans Nov 26-27, so add both dates
+      const desc = (item.description || '').toLowerCase();
+      if (desc.includes('thanksgiving')) {
+        const [year, month, day] = item.date.split('-').map(Number);
+        if (month === 11 && day === 26) {
+          holidayDates.add(`${year}-11-27`);
+        }
+      }
+    }
+  });
+  
+  return holidayDates;
+};
+
+/**
  * Checks if a date string is a fixed holiday
  * @param {string} dateStr - Date string in YYYY-MM-DD format
  * @param {Set} holidayDates - Set of holiday date strings

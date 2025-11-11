@@ -40,7 +40,8 @@ import {
   dateToISOString
 } from "../utils/calendarUtils";
 import { validateCsvFiles } from "../utils/csvValidation";
-import { cascadeMoveItems, findNextClassDay, findPreviousClassDay, isClassDay } from "../utils/classDayUtils";
+import { cascadeMoveItems, findNextClassDay, findPreviousClassDay, isClassDay, isItemOnClassDay, filterItemsOnClassDays, convertScheduleForCascade } from "../utils/classDayUtils";
+import { buildHolidayDateSetFromSchedule } from "../utils/holidayUtils";
 import { debugLog, debugError, debugWarn } from "../utils/debug";
 
 // Config
@@ -460,22 +461,7 @@ function Calendar() {
     const updatedSchedule = [...classSchedule]; // Use spread to ensure new array reference
     
     // Build holiday date set from class schedule items (holidays and final exams) for cascading logic
-    const holidayDates = new Set();
-    updatedSchedule.forEach(item => {
-      // Use utility function to check if it's a fixed item (holiday or final exam)
-      if (isFixedItem(item)) {
-        holidayDates.add(item.date);
-        
-        // Thanksgiving spans Nov 26-27, so add both dates
-        const desc = (item.description || '').toLowerCase();
-        if (desc.includes('thanksgiving')) {
-          const [year, month, day] = item.date.split('-').map(Number);
-          if (month === 11 && day === 26) {
-            holidayDates.add(`${year}-11-27`);
-          }
-        }
-      }
-    });
+    const holidayDates = buildHolidayDateSetFromSchedule(updatedSchedule, isFixedItem);
     
     debugLog('Holiday dates set:', Array.from(holidayDates));
     
@@ -517,21 +503,7 @@ function Calendar() {
     });
     
     // Convert to format expected by cascadeMoveItems
-    const scheduleItemsForCascade = updatedSchedule.map(item => {
-      // Use utility function to get item type and check if it's fixed
-      const itemType = getClassScheduleItemType(item.description);
-      const isFixed = isFixedItem(item);
-      
-      return {
-        type: 'classSchedule',
-        date: item.date,
-        itemName: item.description,
-        description: item.description,
-        classScheduleType: itemType,
-        isClassSchedule: true,
-        isFixedHoliday: isFixed // Mark holidays and final exams as fixed so they don't get moved
-      };
-    });
+    const scheduleItemsForCascade = convertScheduleForCascade(updatedSchedule, getClassScheduleItemType, isFixedItem);
     
     let cascadedItems;
     
@@ -668,19 +640,7 @@ function Calendar() {
     }
     
     // Build holiday dates set
-    const holidayDates = new Set();
-    classSchedule.forEach(item => {
-      if (isFixedItem(item)) {
-        holidayDates.add(item.date);
-        const desc = (item.description || '').toLowerCase();
-        if (desc.includes('thanksgiving')) {
-          const [year, month, day] = item.date.split('-').map(Number);
-          if (month === 11 && day === 26) {
-            holidayDates.add(`${year}-11-27`);
-          }
-        }
-      }
-    });
+    const holidayDates = buildHolidayDateSetFromSchedule(classSchedule, isFixedItem);
     
     // Find all items that come AFTER the empty date AND are on class days (sorted by date)
     // Items in "dead zones" (non-class days) are ignored by push/pull operations
@@ -689,10 +649,7 @@ function Calendar() {
         if (isFixedItem(item)) return false; // Don't move fixed items
         if (item.date <= emptyDateStr) return false; // Must be after empty date
         
-        // Only include items that are on actual class days (not dead zones)
-        const [year, month, day] = item.date.split('-').map(Number);
-        const itemDate = new Date(year, month - 1, day);
-        return isClassDay(itemDate, courseSchedule, holidayDates);
+        return isItemOnClassDay(item, courseSchedule, holidayDates);
       })
       .sort((a, b) => a.date.localeCompare(b.date));
     
@@ -750,19 +707,7 @@ function Calendar() {
     }
     
     // Build holiday dates set
-    const holidayDates = new Set();
-    classSchedule.forEach(item => {
-      if (isFixedItem(item)) {
-        holidayDates.add(item.date);
-        const desc = (item.description || '').toLowerCase();
-        if (desc.includes('thanksgiving')) {
-          const [year, month, day] = item.date.split('-').map(Number);
-          if (month === 11 && day === 26) {
-            holidayDates.add(`${year}-11-27`);
-          }
-        }
-      }
-    });
+    const holidayDates = buildHolidayDateSetFromSchedule(classSchedule, isFixedItem);
     
     // Check if the clicked date is a class day or a dead zone
     const isClickedDateClassDay = isClassDay(emptyDate, courseSchedule, holidayDates);
@@ -784,60 +729,173 @@ function Calendar() {
       targetDateStr = dateToISOString(targetClassDay);
     }
     
-    // Check if the target class day is actually empty (if not, we can't push back)
-    const hasItemOnTarget = classSchedule.some(item => 
-      item.date === targetDateStr && !isFixedItem(item)
-    );
-    
-    if (hasItemOnTarget) {
-      const message = `Target class day ${targetDateStr} is occupied. Cannot push back.`;
-      debugLog(message);
-      alert(message);
-      return;
-    }
-    
-    // Find the next class day with an item after the target date
-    // Start searching from the day after the target
-    let searchDate = new Date(targetClassDay);
-    searchDate.setDate(searchDate.getDate() + 1);
+    // Check if the target class day has an item on it
+    // Only check items that are on class days (dead zone items don't count as obstacles)
+    const itemOnTarget = classSchedule.find(item => {
+      if (item.date !== targetDateStr) return false;
+      if (isFixedItem(item)) return false; // Fixed items don't block
+      
+      return isItemOnClassDay(item, courseSchedule, holidayDates);
+    });
     
     let sourceClassDay = null;
     let itemOnSourceDay = null;
+    let sourceDateStr = null;
     
-    // Search for the first class day with an item
-    for (let attempts = 0; attempts < 100; attempts++) {
-      const nextClassDay = findNextClassDay(searchDate, courseSchedule, holidayDates);
-      if (!nextClassDay) {
-        break; // No more class days found
+    if (itemOnTarget) {
+      // If target has an item, we want to push that item back to the previous class day
+      // First, find the previous class day before the target
+      const prevClassDay = findPreviousClassDay(targetClassDay, courseSchedule, holidayDates);
+      if (!prevClassDay) {
+        const message = `No previous class day found before ${targetDateStr}. Cannot push back.`;
+        debugLog(message);
+        alert(message);
+        return;
       }
       
-      const nextDateStr = dateToISOString(nextClassDay);
-      const itemOnNextDay = classSchedule.find(item => 
-        item.date === nextDateStr && !isFixedItem(item)
-      );
+      const prevDateStr = dateToISOString(prevClassDay);
       
-      if (itemOnNextDay) {
-        sourceClassDay = nextClassDay;
-        itemOnSourceDay = itemOnNextDay;
-        break;
+      // Check if the previous class day has an item (only check items on class days)
+      const itemOnPrev = classSchedule.find(item => {
+        if (item.date !== prevDateStr) return false;
+        if (isFixedItem(item)) return false;
+        
+        return isItemOnClassDay(item, courseSchedule, holidayDates);
+      });
+      
+      if (itemOnPrev) {
+        // Previous class day is occupied - we need to cascade forward first
+        // This will be handled by the cascade logic below, but we need to set up the move correctly
+        // We'll move the item on the target date to the previous date, which will trigger cascading
+        debugLog(`Previous class day ${prevDateStr} is occupied by ${itemOnPrev.description}. Will cascade forward.`);
       }
       
-      // Continue searching from the day after this class day
-      searchDate = new Date(nextClassDay);
+      // Push back the item that's on the target date
+      sourceClassDay = targetClassDay;
+      itemOnSourceDay = itemOnTarget;
+      sourceDateStr = targetDateStr;
+      targetDateStr = prevDateStr;
+      targetClassDay = prevClassDay;
+      
+      debugLog(`Pushing back item on clicked date: ${itemOnSourceDay.description} from ${sourceDateStr} to ${targetDateStr}`);
+    } else {
+      // Target is empty, find the next class day with an item after the target date
+      // Start searching from the day after the target
+      let searchDate = new Date(targetClassDay);
       searchDate.setDate(searchDate.getDate() + 1);
+      
+      // Search for the first class day with an item
+      for (let attempts = 0; attempts < 100; attempts++) {
+        const nextClassDay = findNextClassDay(searchDate, courseSchedule, holidayDates);
+        if (!nextClassDay) {
+          break; // No more class days found
+        }
+        
+        const nextDateStr = dateToISOString(nextClassDay);
+        // Only find items that are on class days (dead zone items don't count)
+        const itemOnNextDay = classSchedule.find(item => {
+          if (item.date !== nextDateStr) return false;
+          if (isFixedItem(item)) return false;
+          
+          return isItemOnClassDay(item, courseSchedule, holidayDates);
+        });
+        
+        if (itemOnNextDay) {
+          sourceClassDay = nextClassDay;
+          itemOnSourceDay = itemOnNextDay;
+          break;
+        }
+        
+        // Continue searching from the day after this class day
+        searchDate = new Date(nextClassDay);
+        searchDate.setDate(searchDate.getDate() + 1);
+      }
+      
+      if (!sourceClassDay || !itemOnSourceDay) {
+        debugLog(`No items found on class days after ${targetDateStr}, nothing to push back`);
+        return;
+      }
+      
+      sourceDateStr = dateToISOString(sourceClassDay);
+      debugLog(`Pushing back item: ${itemOnSourceDay.description} from ${sourceDateStr} to ${targetDateStr}`);
     }
     
-    if (!sourceClassDay || !itemOnSourceDay) {
-      debugLog(`No items found on class days after ${targetDateStr}, nothing to push back`);
+    // Check if target is occupied - if so, use cascadeMoveItems to handle it properly
+    const targetItem = classSchedule.find(item => {
+      if (item.date !== targetDateStr) return false;
+      if (isFixedItem(item)) return false;
+      
+      return isItemOnClassDay(item, courseSchedule, holidayDates);
+    });
+    
+    if (targetItem) {
+      // Target is occupied - use cascadeMoveItems to handle the collision
+      debugLog(`Target ${targetDateStr} is occupied by ${targetItem.description}, using cascadeMoveItems`);
+      
+      // Convert schedule to format expected by cascadeMoveItems
+      const scheduleItemsForCascade = convertScheduleForCascade(classSchedule, getClassScheduleItemType, isFixedItem);
+      
+      const cascadedItems = cascadeMoveItems(
+        scheduleItemsForCascade,
+        sourceDateStr,
+        targetDateStr,
+        courseSchedule,
+        holidayDates,
+        itemOnSourceDay.description
+      );
+      
+      // Convert back to class schedule format
+      const cascadedMap = new Map();
+      cascadedItems.forEach(ci => {
+        const key = ci.itemName || ci.description;
+        if (key) {
+          cascadedMap.set(key, ci);
+        }
+      });
+      
+      const newClassSchedule = classSchedule.map(item => {
+        if (isFixedItem(item)) {
+          return item; // Preserve fixed items
+        }
+        
+        const key = item.description;
+        const cascadedItem = cascadedMap.get(key);
+        
+        if (cascadedItem && cascadedItem.date !== item.date) {
+          return { ...item, date: cascadedItem.date };
+        }
+        
+        return item;
+      });
+      
+      setClassSchedule(newClassSchedule);
       return;
     }
     
-    const sourceDateStr = dateToISOString(sourceClassDay);
+    // Target is empty - move the item and cascade forward to fill the gap
+    // Use the same approach as push forward: find all items after source and move them forward
+    const itemsAfterSource = classSchedule
+      .filter(item => {
+        if (isFixedItem(item)) return false; // Don't move fixed items
+        if (item.date <= sourceDateStr) return false; // Must be after source date
+        
+        return isItemOnClassDay(item, courseSchedule, holidayDates);
+      })
+      .sort((a, b) => a.date.localeCompare(b.date)); // Sort ascending (earliest first)
     
-    debugLog(`Pushing back item: ${itemOnSourceDay.description} from ${sourceDateStr} to ${targetDateStr}`);
+    if (itemsAfterSource.length === 0) {
+      debugLog('No items to push back');
+      return;
+    }
     
-    // First, move the item from source to target
+    debugLog(`Pushing back ${itemsAfterSource.length} items from ${sourceDateStr} to ${targetDateStr}`);
+    
+    // Move each item forward by one class day, starting from the target date
     const updatedSchedule = [...classSchedule];
+    let currentDate = new Date(targetClassDay);
+    currentDate.setDate(currentDate.getDate() + 1); // Start from day after target
+    
+    // First, move the source item to the target
     const sourceItemIndex = updatedSchedule.findIndex(item => 
       item.date === itemOnSourceDay.date && item.description === itemOnSourceDay.description
     );
@@ -847,68 +905,30 @@ function Calendar() {
       debugLog(`Moved ${itemOnSourceDay.description} from ${sourceDateStr} to ${targetDateStr}`);
     }
     
-    // Now cascade: find all items after the source date that are on class days and shift them backward
-    // Items in "dead zones" (non-class days) are ignored by push/pull operations
-    // Process items in order (earliest first) so each move fills the gap left by the previous
-    const itemsAfterSource = classSchedule
-      .filter(item => {
-        if (isFixedItem(item)) return false; // Don't move fixed items
-        if (item.date <= sourceDateStr) return false; // Must be after source date
-        
-        // Only include items that are on actual class days (not dead zones)
-        const [year, month, day] = item.date.split('-').map(Number);
-        const itemDate = new Date(year, month - 1, day);
-        return isClassDay(itemDate, courseSchedule, holidayDates);
-      })
-      .sort((a, b) => a.date.localeCompare(b.date)); // Sort ascending (earliest first)
-    
-    if (itemsAfterSource.length > 0) {
-      debugLog(`Cascading ${itemsAfterSource.length} items backward from ${sourceDateStr}`);
+    // Now move all items after the source forward to fill the gap
+    itemsAfterSource.forEach((item, index) => {
+      const itemIndex = updatedSchedule.findIndex(si => 
+        si.date === item.date && si.description === item.description
+      );
       
-      itemsAfterSource.forEach(item => {
-        // Find the item in the updated schedule by description (date may have changed)
-        const itemIndex = updatedSchedule.findIndex(si => 
-          si.description === item.description
-        );
-        
-        if (itemIndex === -1) {
-          debugWarn(`Could not find item ${item.description} in schedule`);
-          return;
-        }
-        
-        const currentItem = updatedSchedule[itemIndex];
-        const currentItemDateStr = currentItem.date;
-        
-        // Parse the current date
-        const [year, month, day] = currentItemDateStr.split('-').map(Number);
-        const currentItemDate = new Date(year, month - 1, day);
-        
-        // Find the previous class day from this item's current position
-        const prevClassDay = findPreviousClassDay(currentItemDate, courseSchedule, holidayDates);
-        
-        if (!prevClassDay) {
-          debugWarn(`Could not find previous class day for ${currentItem.description}`);
-          return;
-        }
-        
-        const prevDateStr = dateToISOString(prevClassDay);
-        
-        // Check if the target position is already occupied (by a non-fixed item that's not this item)
-        const hasItemOnTarget = updatedSchedule.some(si => 
-          si.date === prevDateStr && !isFixedItem(si) && 
-          si.description !== currentItem.description
-        );
-        
-        if (hasItemOnTarget) {
-          debugWarn(`Target position ${prevDateStr} is occupied, skipping cascade for ${currentItem.description}`);
-          return;
-        }
-        
-        // Move the item to the previous class day position
-        updatedSchedule[itemIndex] = { ...currentItem, date: prevDateStr };
-        debugLog(`Cascaded ${currentItem.description} from ${currentItemDateStr} to ${prevDateStr}`);
-      });
-    }
+      if (itemIndex === -1) return;
+      
+      // Find the next class day starting from currentDate
+      const nextClassDay = findNextClassDay(currentDate, courseSchedule, holidayDates);
+      if (!nextClassDay) {
+        debugWarn(`Could not find next class day for item ${item.description}`);
+        return;
+      }
+      
+      const nextDateStr = dateToISOString(nextClassDay);
+      updatedSchedule[itemIndex] = { ...item, date: nextDateStr };
+      
+      debugLog(`Moved ${item.description} from ${item.date} to ${nextDateStr}`);
+      
+      // Update currentDate for next iteration
+      currentDate = new Date(nextClassDay);
+      currentDate.setDate(currentDate.getDate() + 1);
+    });
     
     setClassSchedule(updatedSchedule);
   };

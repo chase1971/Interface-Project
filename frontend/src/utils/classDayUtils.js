@@ -3,6 +3,60 @@ import { getDateForClassDay, getClassDayNumber, getCourseSchedule, isFixedItem }
 import { createHolidayDateSet } from './holidayUtils';
 
 /**
+ * Checks if a schedule item is on a class day (not in a dead zone)
+ * @param {Object} item - Schedule item with a date property
+ * @param {string} courseSchedule - Course schedule type ('MW' or 'TR')
+ * @param {Set} holidayDates - Set of holiday date strings
+ * @returns {boolean} - True if the item is on a class day
+ */
+export const isItemOnClassDay = (item, courseSchedule, holidayDates) => {
+  if (!item || !item.date) return false;
+  
+  const [year, month, day] = item.date.split('-').map(Number);
+  const itemDate = new Date(year, month - 1, day);
+  return isClassDay(itemDate, courseSchedule, holidayDates);
+};
+
+/**
+ * Filters schedule items to only include those on class days (excludes dead zone items)
+ * @param {Array} items - Array of schedule items
+ * @param {string} courseSchedule - Course schedule type ('MW' or 'TR')
+ * @param {Set} holidayDates - Set of holiday date strings
+ * @returns {Array} - Filtered array of items on class days
+ */
+export const filterItemsOnClassDays = (items, courseSchedule, holidayDates) => {
+  return items.filter(item => {
+    if (isFixedItem(item)) return false; // Don't include fixed items in this filter
+    
+    return isItemOnClassDay(item, courseSchedule, holidayDates);
+  });
+};
+
+/**
+ * Converts class schedule items to the format expected by cascadeMoveItems
+ * @param {Array} classSchedule - Array of class schedule items
+ * @param {Function} getClassScheduleItemType - Function to get item type from description
+ * @param {Function} isFixedItem - Function to check if item is fixed
+ * @returns {Array} - Array of items in cascade format
+ */
+export const convertScheduleForCascade = (classSchedule, getClassScheduleItemType, isFixedItem) => {
+  return classSchedule.map(item => {
+    const itemType = getClassScheduleItemType(item.description);
+    const isFixed = isFixedItem(item);
+    
+    return {
+      type: 'classSchedule',
+      date: item.date,
+      itemName: item.description,
+      description: item.description,
+      classScheduleType: itemType,
+      isClassSchedule: true,
+      isFixedHoliday: isFixed
+    };
+  });
+};
+
+/**
  * Finds the next class day after a given date, respecting the schedule pattern
  * @param {Date|string} date - The starting date
  * @param {string} scheduleType - Schedule type ('MW' or 'TR')
@@ -215,19 +269,42 @@ export const isClassDay = (date, scheduleType, holidayDates = new Set()) => {
 export const cascadeMoveItems = (items, sourceDateStr, targetDateStr, scheduleType, holidayDates = new Set(), sourceItemDescription = null) => {
   console.log('=== cascadeMoveItems called ===', { sourceDateStr, targetDateStr, scheduleType, itemsCount: items.length, sourceItemDescription });
   
+  // Filter out items that are in dead zones (non-class days) - they should not participate in collision detection
+  // Only include items that are on actual class days
+  const itemsOnClassDays = items.filter(item => {
+    if (item.type !== 'classSchedule') return false;
+    
+    // Check if the item's date is a class day
+    const [year, month, day] = item.date.split('-').map(Number);
+    const itemDate = new Date(year, month - 1, day);
+    return isClassDay(itemDate, scheduleType, holidayDates);
+  });
+  
+  console.log('Filtered items on class days:', { 
+    originalCount: items.length, 
+    filteredCount: itemsOnClassDays.length,
+    removedItems: items.filter(item => {
+      if (item.type !== 'classSchedule') return false;
+      const [year, month, day] = item.date.split('-').map(Number);
+      const itemDate = new Date(year, month - 1, day);
+      return !isClassDay(itemDate, scheduleType, holidayDates);
+    }).map(i => ({ date: i.date, desc: i.description || i.itemName }))
+  });
+  
   // Find the item being moved - if we have a description, use it to uniquely identify the item
   // This is important when multiple items might have the same date after cascading
   // Also exclude fixed items (holidays and final exams)
+  // Only search in items that are on class days
   let itemToMove;
   if (sourceItemDescription) {
-    itemToMove = items.find(item => 
+    itemToMove = itemsOnClassDays.find(item => 
       item.type === 'classSchedule' && 
       item.date === sourceDateStr && 
       !isFixedItem(item) &&
       (item.itemName === sourceItemDescription || item.description === sourceItemDescription)
     );
   } else {
-    itemToMove = items.find(item => 
+    itemToMove = itemsOnClassDays.find(item => 
       item.type === 'classSchedule' && 
       item.date === sourceDateStr && 
       !isFixedItem(item)
@@ -241,11 +318,13 @@ export const cascadeMoveItems = (items, sourceDateStr, targetDateStr, scheduleTy
   
   console.log('Item to move found:', { description: itemToMove.description || itemToMove.itemName, date: itemToMove.date });
   
-  // Create a deep copy of items to modify
+  // Create a deep copy of ALL items (including dead zone items) to modify
+  // We need to preserve dead zone items in the final result, but only cascade items on class days
   const updatedItems = items.map(item => ({ ...item }));
   
   // Find what's currently on the target date (if anything) - exclude the item we're moving and fixed items
-  const targetItem = updatedItems.find(item => 
+  // Only check items that are on class days (dead zone items don't count as collisions)
+  const targetItem = itemsOnClassDays.find(item => 
     item.type === 'classSchedule' && 
     item.date === targetDateStr && 
     !isFixedItem(item) && 
@@ -290,8 +369,9 @@ export const cascadeMoveItems = (items, sourceDateStr, targetDateStr, scheduleTy
       
       // Check if next date is already occupied by a different item (BEFORE we move targetItem there)
       // We need to find it by matching the date AND ensuring it's not the item we're moving, the target item, or a fixed item
+      // Only check items that are on class days (dead zone items don't count as collisions)
       // Save the nextItem BEFORE we modify anything, so we can find it later even after targetItem moves to the same date
-      const nextItem = updatedItems.find(item => 
+      const nextItem = itemsOnClassDays.find(item => 
         item.type === 'classSchedule' && 
         item.date === nextDateStr && 
         !isFixedItem(item) && 
@@ -314,8 +394,8 @@ export const cascadeMoveItems = (items, sourceDateStr, targetDateStr, scheduleTy
         const nextAfterHoliday = findNextClassDay(dayAfterHoliday, scheduleType, holidayDates);
         if (nextAfterHoliday) {
           const nextAfterHolidayStr = nextAfterHoliday.toISOString().split('T')[0];
-          // Check if that date is occupied
-          const itemAfterHoliday = updatedItems.find(item => 
+          // Check if that date is occupied (only check items on class days)
+          const itemAfterHoliday = itemsOnClassDays.find(item => 
             item.type === 'classSchedule' && 
             item.date === nextAfterHolidayStr && 
             !isFixedItem(item) && 
@@ -379,7 +459,8 @@ export const cascadeMoveItems = (items, sourceDateStr, targetDateStr, scheduleTy
             // Find nextItem by its unique identifier - it should now be at nextDateStr (same as targetItem)
             // Make sure it's not a fixed item and it's not the targetItem or itemToMove
             // Use the saved nextItemId to find it reliably
-            const nextItemToCascade = updatedItems.find(item =>
+            // Only check items that are on class days
+            const nextItemToCascade = itemsOnClassDays.find(item =>
               item.type === 'classSchedule' &&
               (item.itemName === nextItemId || item.description === nextItemId) &&
               item.date === nextDateStr && // After moving targetItem, nextItem is at nextDateStr

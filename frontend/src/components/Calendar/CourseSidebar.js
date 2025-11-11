@@ -138,20 +138,20 @@ const CourseSidebar = ({
             >
               <div className="calendar-options-menu-buttons">
                 <button
-                  className="calendar-options-menu-button"
+                  className="calendar-options-menu-button calendar-options-future-planning"
                   onClick={onFuturePlanningClick}
                 >
                   Future Planning
                 </button>
                 <button
-                  className="calendar-options-menu-button"
+                  className="calendar-options-menu-button calendar-options-save-default"
                   onClick={onSaveDefaultCalendarClick}
                 >
                   Save Current Calendar to Default
                 </button>
                 <button
                   type="button"
-                  className="calendar-options-menu-button"
+                  className="calendar-options-menu-button calendar-options-clear"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();

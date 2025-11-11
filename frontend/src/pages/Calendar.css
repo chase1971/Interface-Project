@@ -227,10 +227,10 @@
 .calendar-options-toggle-button {
   width: 100%;
   padding: 0.75rem 1rem;
-  background: rgba(255, 193, 7, 0.1);
-  border: 2px solid #ffc107;
+  background: rgba(0, 179, 255, 0.1);
+  border: 2px solid #00b3ff;
   border-radius: 6px;
-  color: #ffc107;
+  color: #00b3ff;
   font-family: "Rajdhani", sans-serif;
   font-weight: 600;
   font-size: 0.9rem;
@@ -243,8 +243,8 @@
 }
 
 .calendar-options-toggle-button:hover {
-  background: rgba(255, 193, 7, 0.2);
-  box-shadow: 0 0 10px rgba(255, 193, 7, 0.4);
+  background: rgba(0, 179, 255, 0.2);
+  box-shadow: 0 0 10px rgba(0, 179, 255, 0.4);
   transform: translateY(-2px);
 }
 
@@ -296,6 +296,42 @@
   background: rgba(255, 193, 7, 0.2);
   box-shadow: 0 0 10px rgba(255, 193, 7, 0.4);
   transform: translateY(-2px);
+}
+
+/* Future Planning button - Blue */
+.calendar-options-future-planning {
+  background: rgba(0, 179, 255, 0.1);
+  border: 2px solid #00b3ff;
+  color: #00b3ff;
+}
+
+.calendar-options-future-planning:hover {
+  background: rgba(0, 179, 255, 0.2);
+  box-shadow: 0 0 10px rgba(0, 179, 255, 0.4);
+}
+
+/* Save Current Calendar to Default button - Green */
+.calendar-options-save-default {
+  background: rgba(76, 175, 80, 0.1);
+  border: 2px solid #4caf50;
+  color: #4caf50;
+}
+
+.calendar-options-save-default:hover {
+  background: rgba(76, 175, 80, 0.2);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+}
+
+/* Clear Calendar button - Red */
+.calendar-options-clear {
+  background: rgba(244, 67, 54, 0.1);
+  border: 2px solid #f44336;
+  color: #f44336;
+}
+
+.calendar-options-clear:hover {
+  background: rgba(244, 67, 54, 0.2);
+  box-shadow: 0 0 10px rgba(244, 67, 54, 0.4);
 }
 
 /* Semester Sidebar */
