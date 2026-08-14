@@ -3,9 +3,9 @@
 
 // List of possible backend servers (update IPs as needed)
 const POSSIBLE_SERVERS = [
-  'http://localhost:5000',        // If running on the same machine
-  'http://10.0.0.6:5000',         // Desktop IP (update with your actual IP)
-  'http://192.168.1.100:5000',    // Laptop IP (update with your actual IP)
+  'http://localhost:3005',        // If running on the same machine
+  'http://10.0.0.6:3005',         // Desktop IP (update with your actual IP)
+  'http://192.168.1.100:3005',    // Laptop IP (update with your actual IP)
 ];
 
 // Timeout for each server check (in milliseconds)
@@ -27,11 +27,14 @@ async function checkServerHealth(serverUrl) {
     const response = await fetch(`${serverUrl}/api/health`, {
       signal: controller.signal,
       method: 'GET',
+      mode: 'cors', // Explicitly allow CORS
+      credentials: 'omit'
     });
     
     clearTimeout(timeoutId);
     return response.ok;
   } catch (error) {
+    console.log(`Server health check failed for ${serverUrl}:`, error);
     return false;
   }
 }
@@ -57,17 +60,21 @@ async function findActiveServer() {
                       window.location.hostname === '127.0.0.1';
   
   if (isLocalhost) {
-    const localhostServer = 'http://localhost:5000';
+    // Try port 3005 first (the configured backend port)
+    const localhostServer = 'http://localhost:3005';
     const isAlive = await checkServerHealth(localhostServer);
     if (isAlive) {
       cachedActiveServer = localhostServer;
+      console.log(`✅ Found backend at: ${localhostServer}`);
       return localhostServer;
+    } else {
+      console.warn(`⚠️ Backend not responding at ${localhostServer}, trying other ports...`);
     }
   }
 
   // Try all possible servers
   for (const serverUrl of POSSIBLE_SERVERS) {
-    if (serverUrl === 'http://localhost:5000' && isLocalhost) {
+    if (serverUrl === 'http://localhost:3005' && isLocalhost) {
       continue; // Already checked above
     }
     

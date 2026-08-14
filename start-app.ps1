@@ -2,9 +2,9 @@
 Write-Host "🚀 Starting Interface Project..." -ForegroundColor Green
 
 # Check if backend is running
-$backendRunning = Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue
+$backendRunning = Get-NetTCPConnection -LocalPort 3005 -ErrorAction SilentlyContinue
 if ($backendRunning) {
-    Write-Host "✅ Backend already running on port 5000" -ForegroundColor Green
+    Write-Host "✅ Backend already running on port 3005" -ForegroundColor Green
 } else {
     Write-Host "🚀 Starting Backend..." -ForegroundColor Yellow
     Start-Process -FilePath "node" -ArgumentList "server.js" -WorkingDirectory "backend" -WindowStyle Minimized
@@ -27,4 +27,4 @@ Start-Process "http://localhost:3000"
 
 Write-Host "🎉 Application started!" -ForegroundColor Green
 Write-Host "📱 Frontend: http://localhost:3000" -ForegroundColor Blue
-Write-Host "🔧 Backend: http://localhost:5000" -ForegroundColor Blue
+Write-Host "🔧 Backend: http://localhost:3005" -ForegroundColor Blue

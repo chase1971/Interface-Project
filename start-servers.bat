@@ -16,6 +16,6 @@ echo Starting Frontend Server...
 start "Frontend Server" cmd /k "cd /d "%~dp0frontend" && npm start"
 
 echo Both servers starting...
-echo Backend: http://localhost:5000
+echo Backend: http://localhost:3005
 echo Frontend: http://localhost:3000
 pause

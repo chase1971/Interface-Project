@@ -2,21 +2,22 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./D2LInterface.css";
 import mavericksLogo from "../assets/mavericks-logo.png";
+import { getApiBaseUrl } from "../config";
 
 function D2LInterface() {
   const navigate = useNavigate();
   const [loggedIn, setLoggedIn] = useState(false);
   const [selectedClass, setSelectedClass] = useState(null);
+  const [selectedCsvPath, setSelectedCsvPath] = useState(null);
   const [status, setStatus] = useState("Ready - Click 'Login to D2L' to begin");
   const [statusColor, setStatusColor] = useState("gray");
 
   // Class URLs mapping
   const classUrls = {
-    FM4202: "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1580392",
-    FM4103: "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1580390",
-    CA4203: "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1580436",
-    CA4201: "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1580434",
-    CA4105: "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1580431",
+    FM4101: "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1616943",
+    CA4101: "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1617029",
+    FM4201: "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1616946",
+    FM4203: "https://d2l.lonestar.edu/d2l/lms/manageDates/date_manager.d2l?fromCMC=1&ou=1616948",
   };
 
   const d2lLoginUrl = "https://d2l.lonestar.edu/d2l/home";
@@ -28,7 +29,8 @@ function D2LInterface() {
     setStatus("Opening browser...");
     setStatusColor("blue");
     try {
-      const response = await fetch("http://localhost:5000/api/d2l/login", {
+      const apiBase = await getApiBaseUrl();
+      const response = await fetch(`${apiBase}/api/d2l/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ classUrl: d2lLoginUrl }),
@@ -63,14 +65,15 @@ function D2LInterface() {
 
     try {
       // Step 1️⃣ - Tell backend to open the course page in persistent Chrome
-      const response = await fetch('http://localhost:5000/api/d2l/select-class', {
+      const apiBase = await getApiBaseUrl();
+      const response = await fetch(`${apiBase}/api/d2l/select-class`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ classCode: className })
       }).catch((fetchError) => {
         // Network error - backend might not be running
         if (fetchError.name === 'TypeError' && fetchError.message.includes('fetch')) {
-          throw new Error('Cannot connect to backend server. Please ensure the backend is running on port 5000.');
+          throw new Error('Cannot connect to backend server. Please ensure the backend is running.');
         }
         throw fetchError;
       });
@@ -104,31 +107,55 @@ function D2LInterface() {
   };
 
   // ============================================
-  // OPEN CSV FILE
+  // OPEN CSV FILE - File picker dialog
   // ============================================
   const handleOpenCSV = async () => {
     try {
-      setStatus("Opening CSV file...");
+      setStatus("Select a CSV file...");
       setStatusColor("blue");
 
-      const response = await fetch("http://localhost:5000/api/d2l/open_csv");
+      // Create a hidden file input element
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.csv';
+      
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) {
+          setStatus("No file selected");
+          setStatusColor("gray");
+          return;
+        }
 
-      let result;
-      try {
-        result = await response.json();
-      } catch {
-        setStatus("✅ CSV file opened successfully.");
-        setStatusColor("green");
-        return;
-      }
+        // Upload the file to the backend
+        const formData = new FormData();
+        formData.append('csvFile', file);
 
-      if (result.success) {
-        setStatus("✅ CSV file opened successfully.");
-        setStatusColor("green");
-      } else {
-        setStatus("❌ Failed to open CSV: " + result.error);
-        setStatusColor("red");
-      }
+        try {
+          const apiBase = await getApiBaseUrl();
+          const response = await fetch(`${apiBase}/api/d2l/upload`, {
+            method: 'POST',
+            body: formData
+          });
+
+          const result = await response.json();
+          
+          if (result.success) {
+            setSelectedCsvPath(result.filePath);
+            setStatus(`✅ CSV loaded: ${file.name}`);
+            setStatusColor("green");
+          } else {
+            setStatus("❌ Failed to upload CSV: " + result.error);
+            setStatusColor("red");
+          }
+        } catch (error) {
+          setStatus("Upload error: " + error.message);
+          setStatusColor("red");
+        }
+      };
+
+      // Trigger the file picker
+      input.click();
     } catch (error) {
       setStatus("Open CSV error: " + error.message);
       setStatusColor("red");
@@ -136,7 +163,7 @@ function D2LInterface() {
   };
 
   // ============================================
-  // PROCESS SCHEDULE
+  // PROCESS SCHEDULE - Uses selected CSV
   // ============================================
   const handleProcessSchedule = async (e) => {
     // stop any parent/sibling click handlers from firing
@@ -152,13 +179,23 @@ function D2LInterface() {
         return;
       }
 
+      if (!selectedCsvPath) {
+        setStatus("❌ Please select a CSV file first!");
+        setStatusColor("red");
+        return;
+      }
+
       setStatus(`⚙️ Processing schedule for ${selectedClass}...`);
       setStatusColor("blue");
 
-      const response = await fetch("http://localhost:5000/api/d2l/process_schedule", {
+      const apiBase = await getApiBaseUrl();
+      const response = await fetch(`${apiBase}/api/d2l/process`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ classCode: selectedClass }),
+        body: JSON.stringify({ 
+          csvFilePath: selectedCsvPath,
+          classUrl: classUrls[selectedClass]
+        }),
       });
 
       let result;
@@ -188,7 +225,8 @@ function D2LInterface() {
   // ============================================
   const handleClearLogin = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/d2l/clear", { method: "POST" });
+      const apiBase = await getApiBaseUrl();
+      const response = await fetch(`${apiBase}/api/d2l/clear`, { method: "POST" });
       const result = await response.json();
       if (result.success) {
         setLoggedIn(false);
@@ -250,15 +288,20 @@ function D2LInterface() {
           {/* CSV AND PROCESSING SECTION */}
           <div className="d2l-section">
             <h3 className="section-title">Schedule Processing</h3>
+            {selectedCsvPath && (
+              <p style={{ fontSize: '14px', color: '#4caf50', marginBottom: '10px' }}>
+                📄 CSV File: {selectedCsvPath.split('\\').pop().split('/').pop()}
+              </p>
+            )}
             <div className="csv-upload">
               <button type="button" className="file-label" onClick={(e) => { e.stopPropagation(); handleOpenCSV(); }}>
-                📂 Open CSV File
+                📂 {selectedCsvPath ? 'Change CSV File' : 'Open CSV File'}
               </button>
               <button
                 type="button"
                 className="update-btn"
                 onClick={(e) => handleProcessSchedule(e)}
-                disabled={!loggedIn || !selectedClass}
+                disabled={!loggedIn || !selectedClass || !selectedCsvPath}
               >
                 ⚙️ Process Schedule
               </button>

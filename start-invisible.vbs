@@ -3,21 +3,16 @@ Set objFSO = CreateObject("Scripting.FileSystemObject")
 
 ' Get the current directory where the script is located
 strScriptPath = objFSO.GetParentFolderName(WScript.ScriptFullName)
+strPowerShellScript = strScriptPath & "\start-servers-silent.ps1"
 
-' Kill all Node.js processes
-WshShell.Run "taskkill /F /IM node.exe", 0, True
+' Run PowerShell script invisibly
+' -NoProfile = Don't load user profile (faster startup)
+' -ExecutionPolicy Bypass = Allow script to run
+' -WindowStyle Hidden = No window
+' -File = Run the script file
+WshShell.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & strPowerShellScript & """", 0, False
 
-' Wait for processes to stop
-WScript.Sleep 2000
-
-' Start backend invisibly
-WshShell.CurrentDirectory = strScriptPath & "\backend"
-WshShell.Run "node server.js", 0, False
-
-' Wait for backend to initialize
-WScript.Sleep 3000
-
-' Start frontend invisibly
-WshShell.CurrentDirectory = strScriptPath & "\frontend"
-WshShell.Run "cmd /c npm start", 0, False
+' Wait for everything to start (increased time for cleanup), then open browser
+WScript.Sleep 20000
+WshShell.Run "http://localhost:3000", 1, False
 

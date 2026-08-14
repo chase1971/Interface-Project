@@ -66,8 +66,8 @@ npm start
 
 You should see:
 ```
-D2L Backend API running on port 5000
-Health check: http://localhost:5000/api/health
+D2L Backend API running on port 3005
+Health check: http://localhost:3005/api/health
 ```
 
 ### Step 2: The React Frontend is Already Running
@@ -160,14 +160,14 @@ python extract_grades_cli.py C "CA 4201"
 ## 🔧 Troubleshooting
 
 ### Backend not responding?
-- Check if port 5000 is already in use
+- Check if port 3005 is already in use
 - Look for startup errors in the backend terminal
 - Verify `Interface-Project/backend/server.js` has no syntax errors
 
 ### React can't connect to backend?
-- Ensure backend is running on port 5000
+- Ensure backend is running on port 3005
 - Check browser console for CORS errors
-- Verify `REACT_APP_API_URL` is not set (defaults to http://localhost:5000)
+- Verify `REACT_APP_API_URL` is not set (defaults to http://localhost:3005)
 
 ### Python scripts not found?
 - Backend looks for scripts at: `../../Quiz-extraction/<script_name>.py`

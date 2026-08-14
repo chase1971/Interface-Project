@@ -80,7 +80,7 @@ function MakeupExamInterface() {
     addLogMessage("Opening browser for login...");
     
     try {
-      const response = await fetch('http://localhost:5000/api/makeup/login', {
+      const response = await fetch('http://localhost:3005/api/makeup/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -149,7 +149,7 @@ function MakeupExamInterface() {
     
     try {
       console.log('📡 Making request to load-import-file with:', { drive, className });
-      const response = await fetch('http://localhost:5000/api/makeup/load-import-file', {
+      const response = await fetch('http://localhost:3005/api/makeup/load-import-file', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -237,7 +237,7 @@ function MakeupExamInterface() {
       formData.append('customSpecifyText', customSpecifyText);
       formData.append('termCode', termCode);
 
-      const response = await fetch('http://localhost:5000/api/makeup/start-automation', {
+      const response = await fetch('http://localhost:3005/api/makeup/start-automation', {
         method: 'POST',
         body: formData
       });
@@ -282,7 +282,7 @@ function MakeupExamInterface() {
 
   const handleClearLogin = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/makeup/clear', {
+      const response = await fetch('http://localhost:3005/api/makeup/clear', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
